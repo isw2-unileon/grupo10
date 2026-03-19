@@ -16,7 +16,7 @@ name: 03 · Code Quality
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
     paths:
       # Teaching note: `paths` makes the workflow ONLY trigger when these files
       # change. No point running lint if only the README was updated.
