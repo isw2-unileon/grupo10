@@ -15,30 +15,34 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
+	try{
+		db, err := sql.Open("postgres", dbURL)
+		if err != nil {
+			log.Fatalf("Failed to open database connection: %v", err)
+		}
+		defer db.Close()
 
-	db, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Fatalf("Failed to open database connection: %v", err)
+		if err := db.Ping(); err != nil {
+			log.Fatalf("Failed to ping database: %v", err)
+		}
+		log.Println("Successfully connected to the database")
+
+		// Run migrations automatically on startup
+		if err := runMigrations(db); err != nil {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
+
+		http.HandleFunc("/health", healthHandler(db))
+
+		port := ":8080"
+		log.Printf("Server listening on %s", port)
+		if err := http.ListenAndServe(port, nil); err != nil {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}catch{
+		log.Fatalf("An unexpected error occurred: %v", err)
 	}
-	defer db.Close()
-
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
-	log.Println("Successfully connected to the database")
-
-	// Run migrations automatically on startup
-	if err := runMigrations(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
-
-	http.HandleFunc("/health", healthHandler(db))
-
-	port := ":8080"
-	log.Printf("Server listening on %s", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatalf("Server failed: %v", err)
-	}
+	
 }
 
 // runMigrations reads up.sql from disk and executes it against the database.
