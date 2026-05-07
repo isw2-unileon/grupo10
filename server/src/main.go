@@ -72,10 +72,16 @@ func healthHandler(db *sql.DB) http.HandlerFunc {
 				log.Printf("Failed to create JSON encoder: %v", err)
 				return
 			}
-			encoder.Encode(map[string]string{
+			if encoder.Encode(map[string]string{
 				"status": "unhealthy",
 				"error":  err.Error(),
-			})
+			}) != nil {
+				log.Printf("Failed to encode JSON response: %v", err)
+			}
+			// encoder.Encode(map[string]string{
+			// 	"status": "unhealthy",
+			// 	"error":  err.Error(),
+			// })
 			return
 		}
 		okEncoder := json.NewEncoder(w)
@@ -83,8 +89,13 @@ func healthHandler(db *sql.DB) http.HandlerFunc {
 			log.Printf("Failed to create JSON encoder")
 			return
 		}
-		okEncoder.Encode(map[string]string{
+		// okEncoder.Encode(map[string]string{
+		// 	"status": "ok",
+		// })
+		if okEncoder.Encode(map[string]string{
 			"status": "ok",
-		})
+		}) != nil {
+			log.Printf("Failed to encode JSON response")
+		}
 	}
 }
