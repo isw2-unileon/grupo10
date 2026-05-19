@@ -20,16 +20,16 @@ on:
     paths:
       # Teaching note: `paths` makes the workflow ONLY trigger when these files
       # change. No point running lint if only the README was updated.
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.golangci.yml'
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".golangci.yml"
   pull_request:
     paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.golangci.yml'
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - ".golangci.yml"
   workflow_dispatch:
 
 jobs:
@@ -74,6 +74,7 @@ jobs:
   # ── Job 3: golangci-lint ─────────────────────────────────────────────────────
   # golangci-lint runs many linters in parallel: staticcheck, errcheck,
   # gosimple, unused, and many more. See .golangci.yml for configuration.
+  # ── Job 3: golangci-lint ─────────────────────────────────────────────────────
   lint:
     name: golangci-lint
     runs-on: ubuntu-latest
@@ -82,11 +83,10 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: false   # golangci-lint manages its own cache below
+          cache: false # golangci-lint maneja su propia caché debajo
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
-          # Teaching note: golangci-lint-action automatically caches the lint
-          # results and binary, making repeated runs much faster.
+          # SOLUCIÓN: Cambiamos 'latest' por una versión fija y estable
+          version: v1.64
