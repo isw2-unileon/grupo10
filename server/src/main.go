@@ -15,14 +15,17 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to open database connection: %v", err)
 	}
-	closed := db.Close()
-	if closed != nil {
-		log.Fatalf("Failed to close database connection: %v", err)
-	}
+
+	// SOLUCIÓN: El defer asegura que la base de datos se cierre SOLO cuando
+	// la función main termine por completo (al apagar el servidor).
+	defer db.Close()
+
+	// Ahora el Ping funcionará perfectamente porque la conexión sigue abierta.
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
@@ -46,7 +49,6 @@ func main() {
 }
 
 // runMigrations reads up.sql from disk and executes it against the database.
-// Using IF NOT EXISTS makes it safe to run multiple times without errors.
 func runMigrations(db *sql.DB) error {
 	log.Println("Running migrations...")
 
@@ -70,35 +72,18 @@ func healthHandler(db *sql.DB) http.HandlerFunc {
 
 		if err := db.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			encoder := json.NewEncoder(w)
-			if encoder != nil {
-				log.Printf("Failed to create JSON encoder: %v", err)
-				return
-			}
-			if encoder.Encode(map[string]string{
+			// json.NewEncoder se usa directamente ya que no devuelve error al inicializarse
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"status": "unhealthy",
 				"error":  err.Error(),
-			}) != nil {
-				log.Printf("Failed to encode JSON response: %v", err)
-			}
-			// encoder.Encode(map[string]string{
-			// 	"status": "unhealthy",
-			// 	"error":  err.Error(),
-			// })
+			})
 			return
 		}
-		okEncoder := json.NewEncoder(w)
-		if okEncoder != nil {
-			log.Printf("Failed to create JSON encoder")
-			return
-		}
-		// okEncoder.Encode(map[string]string{
-		// 	"status": "ok",
-		// })
-		if okEncoder.Encode(map[string]string{
+
+		// Estado OK corregido sin el condicional que rompía el flujo
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
-		}) != nil {
-			log.Printf("Failed to encode JSON response")
-		}
+		})
 	}
 }
