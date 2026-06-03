@@ -49,12 +49,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, token, err := h.svc.Register(r.Context(), RegisterInput{
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: req.Password,
-		Role:     req.Role,
-	})
+	u, token, err := h.svc.Register(r.Context(), RegisterInput(req))
 	if err != nil {
 		writeError(w, err)
 		return
