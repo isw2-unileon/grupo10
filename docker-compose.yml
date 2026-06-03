@@ -44,8 +44,8 @@ services:
 
   server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: server/Dockerfile
     container_name: learning_platform_server
     env_file:
       - .env
@@ -55,6 +55,7 @@ services:
       - ./server:/app
     environment:
       - DATABASE_URL=postgres://${DB_USER:-user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-learning_platform}?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET:-dev-insecure-secret}
     depends_on:
       db:
         condition: service_healthy
