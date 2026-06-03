@@ -61,7 +61,7 @@ func registerUserRoutes(mux *http.ServeMux, db *sql.DB) {
 	repo := users.NewPostgresRepository(db)
 	issuer := users.NewJWTIssuer(secret, tokenTTL)
 	svc := users.NewService(repo, issuer)
-	users.NewHandler(svc).RegisterRoutes(mux)
+	users.NewHandler(svc, issuer).RegisterRoutes(mux)
 }
 
 // runMigrations reads up.sql from disk and executes it against the database.

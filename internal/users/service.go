@@ -96,6 +96,11 @@ func (s *Service) Authenticate(ctx context.Context, email, password string) (*Us
 	return u, token, nil
 }
 
+// ByID returns the user with the given ID, or ErrUserNotFound.
+func (s *Service) ByID(ctx context.Context, id string) (*User, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
 func validateRegister(in RegisterInput) error {
 	if in.Name == "" || len(in.Name) > maxNameLength {
 		return fmt.Errorf("%w: name is required (max %d characters)", ErrValidation, maxNameLength)
