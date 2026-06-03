@@ -6,24 +6,49 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-// newTestHandler builds a Handler backed by the in-memory service helpers from
-// service_test.go, plus the mux with the routes wired, so tests exercise the
-// real method-aware routing without a database.
+// newTestHandler builds a Handler backed by the in-memory fakeRepo, plus the mux
+// with the routes wired, so tests exercise the real method-aware routing and the
+// auth middleware without a database. The same issuer signs and parses tokens.
 func newTestHandler() http.Handler {
+	issuer := NewJWTIssuer("test-secret", time.Hour)
+	svc := NewService(newFakeRepo(), issuer)
 	mux := http.NewServeMux()
-	NewHandler(newTestService()).RegisterRoutes(mux)
+	NewHandler(svc, issuer).RegisterRoutes(mux)
 	return mux
 }
 
 // do sends a request with the given JSON body and returns the recorded response.
 func do(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
+	return doAuth(h, method, path, body, "")
+}
+
+// doAuth is like do but sets a Bearer Authorization header when token is non-empty.
+func doAuth(h http.Handler, method, path, body, token string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+// registerAndToken registers the default valid user and returns its auth token.
+func registerAndToken(t *testing.T, h http.Handler) string {
+	t.Helper()
+	rec := do(h, http.MethodPost, "/api/register", registerBody(validInput()))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("setup register failed: %d (body: %s)", rec.Code, rec.Body.String())
+	}
+	var resp authResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid register response: %v", err)
+	}
+	return resp.Token
 }
 
 func registerBody(in RegisterInput) string {
@@ -157,5 +182,58 @@ func TestHandlerLogin_InvalidJSONBadRequest(t *testing.T) {
 	rec := do(h, http.MethodPost, "/api/login", "{not-json")
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 on malformed JSON, got %d", rec.Code)
+	}
+}
+
+func TestHandlerMe_OK(t *testing.T) {
+	h := newTestHandler()
+	token := registerAndToken(t, h)
+
+	rec := doAuth(h, http.MethodGet, "/api/me", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", rec.Code, rec.Body.String())
+	}
+
+	var u User
+	if err := json.Unmarshal(rec.Body.Bytes(), &u); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if u.Email != "ada@example.com" || u.Role != RoleStudent {
+		t.Errorf("unexpected user payload: %+v", u)
+	}
+	// The hash must never be exposed, even on the authenticated endpoint.
+	if strings.Contains(rec.Body.String(), "password_hash") {
+		t.Error("response must not leak the password hash")
+	}
+}
+
+func TestHandlerMe_NoHeaderUnauthorized(t *testing.T) {
+	h := newTestHandler()
+
+	rec := do(h, http.MethodGet, "/api/me", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 without Authorization header, got %d", rec.Code)
+	}
+}
+
+func TestHandlerMe_MalformedHeaderUnauthorized(t *testing.T) {
+	h := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req.Header.Set("Authorization", "Token abc.def.ghi") // wrong scheme
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 on malformed header, got %d", rec.Code)
+	}
+}
+
+func TestHandlerMe_InvalidTokenUnauthorized(t *testing.T) {
+	h := newTestHandler()
+
+	rec := doAuth(h, http.MethodGet, "/api/me", "", "not-a-real-token")
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 on invalid token, got %d", rec.Code)
 	}
 }
