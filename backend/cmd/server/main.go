@@ -3,37 +3,52 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/isw2-unileon/grupo10/internal/users"
+	"github.com/isw2-unileon/grupo10/backend/internal/users"
 	_ "github.com/lib/pq"
 )
 
-const tokenTTL = 24 * time.Hour
+const (
+	tokenTTL     = 24 * time.Hour
+	readTimeout  = 15 * time.Second
+	writeTimeout = 15 * time.Second
+	idleTimeout  = 60 * time.Second
+)
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run wires up the server and blocks until it stops. Returning an error instead
+// of calling log.Fatal directly lets deferred cleanup (db.Close) run on exit.
+func run() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Fatal("DATABASE_URL environment variable is not set")
+		return errors.New("missing DATABASE_URL environment variable")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
-		log.Fatalf("Failed to open database connection: %v", err)
+		return fmt.Errorf("open database connection: %w", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		return fmt.Errorf("ping database: %w", err)
 	}
 	log.Println("Successfully connected to the database")
 
 	// Run migrations automatically on startup.
 	if err := runMigrations(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		return fmt.Errorf("run migrations: %w", err)
 	}
 
 	mux := http.NewServeMux()
@@ -44,10 +59,16 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("Server listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Server failed: %v", err)
+
+	srv := &http.Server{
+		Addr:         ":" + port,
+		Handler:      mux,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
 	}
+	log.Printf("Server listening on port %s", port)
+	return srv.ListenAndServe()
 }
 
 // registerUserRoutes builds the users module and wires its HTTP endpoints.
@@ -55,6 +76,7 @@ func registerUserRoutes(mux *http.ServeMux, db *sql.DB) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		log.Println("WARNING: JWT_SECRET is not set, using an insecure development secret")
+		//nolint:gosec // G101: not a real credential, just a dev fallback; production reads JWT_SECRET from the env
 		secret = "dev-insecure-secret"
 	}
 
@@ -83,7 +105,7 @@ func runMigrations(db *sql.DB) error {
 
 // healthHandler returns 200 if the server and DB are up.
 func healthHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := db.Ping(); err != nil {

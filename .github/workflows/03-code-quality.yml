@@ -86,8 +86,8 @@ jobs:
           cache: false # golangci-lint maneja su propia caché debajo
 
       - name: Run golangci-lint
-        # golangci-lint-action v7+ only supports golangci-lint v2.x. We pin the
-        # action to v6 so we can keep the stable v1.64 linter version.
-        uses: golangci/golangci-lint-action@v6
+        # Uses golangci-lint v2 (config in .golangci.yml, version: "2"). The
+        # action major version must match: v9 supports the v2 linter line.
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64
+          version: v2.1.6

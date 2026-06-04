@@ -1,15 +1,43 @@
-# Environment files — never commit secrets
-.env
-.env.local
-.env.*.local
-
-# Local database backups
-/backups/
-
-# Go build output
-/bin/
+# Binaries
 *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+tmp/
 
-# Test & coverage artifacts
+# Go
+*.test
 *.out
-coverage.*
+vendor/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Database backups
+/backups/
+*.dump
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage/
+playwright-report/
+test-results/

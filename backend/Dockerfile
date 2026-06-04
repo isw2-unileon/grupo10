@@ -10,7 +10,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o /app/main ./server/src/main.go
+RUN go build -o /app/main ./backend/cmd/server
 
 # Stage 2: Final lightweight image
 FROM alpine:latest
@@ -23,7 +23,7 @@ RUN apk add --no-cache ca-certificates
 COPY --from=builder /app/main .
 
 # Copy migrations so the server can run them on startup
-COPY --from=builder /app/server/migrations ./migrations
+COPY --from=builder /app/backend/migrations ./migrations
 
 USER appuser
 
