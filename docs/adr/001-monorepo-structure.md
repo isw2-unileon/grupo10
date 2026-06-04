@@ -22,7 +22,9 @@ Use a monorepo with top-level `backend/`, `frontend/` and `e2e/` directories.
   under `backend/` (`backend/cmd/server` for the entry point, `backend/internal`
   for the domain packages). Imports are rooted at
   `github.com/isw2-unileon/grupo10/backend/...`.
-- `frontend/` manages its own dependencies (`package.json`).
+- `frontend/` is a Vue 3 + Vite single-page application (TypeScript, Vue Router,
+  Pinia) and manages its own dependencies (`package.json`). It talks to the
+  backend over `/api/*`, proxied to `http://localhost:8080` in development.
 - `e2e/` holds end-to-end tests (Playwright).
 - CI workflows use path filters so changes to one area don't needlessly trigger
   the others.

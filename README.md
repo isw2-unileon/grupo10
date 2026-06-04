@@ -15,6 +15,7 @@ Make sure you have the following installed before proceeding:
 | Git | Any recent | [git-scm.com](https://git-scm.com/) |
 | Docker Desktop | Latest | [docker.com/get-started](https://www.docker.com/get-started/) |
 | Go | 1.23+ | [go.dev/dl](https://go.dev/dl/) *(only needed to run the server outside Docker)* |
+| Node.js | 18+ | [nodejs.org](https://nodejs.org/) *(only needed to run the frontend outside Docker)* |
 
 > **Windows users:** Docker Desktop already includes Docker Compose. Make sure Docker Desktop is running before executing any `docker` command.
 
@@ -97,15 +98,15 @@ The `-v` flag removes the postgres volume, giving you a clean slate. Migrations 
 
 ```
 grupo10/
-├── server/               # Go backend
-│   ├── src/
-│   │   └── main.go
-│   ├── migrations/
-│   │   ├── up.sql
-│   │   └── down.sql
-│   ├── go.mod
-│   └── Dockerfile
-├── client/               # Frontend
+├── backend/              # Go backend
+│   ├── cmd/server/       # Entry point (composition root)
+│   ├── internal/         # Domain packages (users, notes, calendar, analytics)
+│   └── migrations/       # up.sql / down.sql
+├── frontend/             # Vue 3 + Vite SPA (see frontend/README.md)
+├── e2e/                  # End-to-end tests (Playwright)
+├── docs/                 # Technical documentation and ADRs
+├── go.mod                # Go module (root)
+├── Makefile
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -115,9 +116,31 @@ grupo10/
 ## Running the tests
 
 ```bash
-cd server
+# Backend (from the repo root)
 go test ./...
+
+# Frontend
+cd frontend && npm run test
 ```
+
+Or run everything via the `Makefile`:
+
+```bash
+make test
+```
+
+## Running the frontend (dev)
+
+The frontend is a Vue 3 + Vite SPA in [`frontend/`](frontend/README.md). With
+the backend running, start the dev server:
+
+```bash
+cd frontend
+npm ci
+npm run dev   # http://localhost:5173
+```
+
+Requests to `/api/*` are proxied to the backend at `http://localhost:8080`.
 
 ---
 
