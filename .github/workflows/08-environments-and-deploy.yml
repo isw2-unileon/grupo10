@@ -1,0 +1,103 @@
+# ==============================================================================
+# Workflow 08 — Environments & Deployment
+#
+# PURPOSE: Continuous Deployment pipeline. On every merge to `main`, run the
+# tests, build the binary, and — only if everything is green — trigger a deploy
+# to Render. This turns the Render setup (previously configured by hand in the
+# dashboard) into a visible, in-repo pipeline gated by CI.
+#
+# KEY CONCEPTS:
+#   - Environments          → Named targets (production) with rules and a URL
+#   - Protection rules      → Optional required reviewers / wait timers
+#   - Sequential jobs       → Use `needs:` to enforce order (test → build → deploy)
+#   - Artifacts             → Pass the built binary between jobs
+#   - Deployment status     → GitHub shows deployments on the repo home page
+#
+# SETUP REQUIRED (done once, by someone with access — Claude cannot do this):
+#   1. Render → the backend service → Settings → Deploy Hook → copy the URL.
+#   2. Render → Settings → Build & Deploy → set "Auto-Deploy" to **No**
+#      (otherwise Render deploys twice and skips the CI gate).
+#   3. GitHub → Settings → Environments → New environment → "production".
+#      (Optionally add "required reviewers" here to gate the deploy.)
+#   4. GitHub → Settings → Secrets and variables → Actions → Secrets →
+#      New secret → RENDER_DEPLOY_HOOK_URL = the URL from step 1.
+#   5. GitHub → Settings → Secrets and variables → Actions → Variables →
+#      New variable → PRODUCTION_URL = the public Render app URL (shown in the
+#      deployment panel and the job summary).
+# ==============================================================================
+
+name: 08 · Environments & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ── Job 1: Run tests before deploying ────────────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+
+  # ── Job 2: Build the artifact ─────────────────────────────────────────────────
+  build:
+    name: Build
+    needs: test   # Only runs if `test` succeeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build binary
+        run: go build -o bin/server ./backend/cmd/server
+      # Teaching note: Artifacts pass files between jobs. The `deploy` job below
+      # could download this binary without rebuilding. Render builds from source
+      # itself, so here the build also acts as a final compile gate before deploy.
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: server-binary
+          path: bin/server
+
+  # ── Job 3: Deploy to Production (Render) ──────────────────────────────────────
+  deploy-production:
+    name: Deploy → Production
+    needs: build   # Must build (and therefore test) successfully first
+    runs-on: ubuntu-latest
+
+    # Teaching note: The `environment:` key links this job to a GitHub Environment.
+    # GitHub tracks deployment history and shows the URL on the repo home page.
+    # Add "required reviewers" to this environment in Settings to pause here for
+    # a manual approval before the deploy runs.
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+
+    steps:
+      - name: Trigger Render deploy
+        # Teaching note: A Render "Deploy Hook" is a secret URL that, when hit,
+        # starts a new deploy of the service. We store it as a repo/environment
+        # secret so it never appears in the code. `-f` makes curl fail (non-zero
+        # exit) on HTTP errors, so a bad hook fails the job instead of passing
+        # silently.
+        run: |
+          echo "Triggering Render deploy for commit ${{ github.sha }}..."
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" > /dev/null
+          echo "✅ Deploy triggered on Render"
+
+      - name: Write deployment summary
+        run: |
+          echo "## Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Production (Render) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed by | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | ${{ vars.PRODUCTION_URL }} |" >> $GITHUB_STEP_SUMMARY
