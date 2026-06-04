@@ -7,30 +7,32 @@ import (
 	"time"
 )
 
-// CalendarHandler expone los métodos HTTP
-type CalendarHandler struct {
+// Handler expone los métodos HTTP
+type Handler struct {
 	svc Service
 }
 
 // NewHandler inyecta el servicio en el handler
-func NewHandler(svc Service) *CalendarHandler {
-	return &CalendarHandler{svc: svc}
+func NewHandler(svc Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 // ==========================================
 // ESTRUCTURAS DE PETICIÓN (Lo que esperamos recibir en el JSON)
 // ==========================================
 
+// CreateEventRequest representa el payload para crear un evento
 type CreateEventRequest struct {
-	OwnerID  string    `json:"owner_id"` // TODO: En el futuro lo sacaremos del JWT automáticamente
+	OwnerID  string    `json:"owner_id"`
 	Title    string    `json:"title"`
 	StartsAt time.Time `json:"starts_at"`
 	EndsAt   time.Time `json:"ends_at"`
 }
 
+// BookTutoringRequest representa el payload para reservar una tutoría
 type BookTutoringRequest struct {
 	EventID   string `json:"event_id"`
-	StudentID string `json:"student_id"` // TODO: También lo sacaremos del JWT
+	StudentID string `json:"student_id"`
 }
 
 // ==========================================

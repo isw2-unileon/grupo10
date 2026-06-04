@@ -11,7 +11,7 @@ import (
 // Event representa un hueco en el calendario (ej. "Tutoría de Programación")
 type Event struct {
 	ID        string    `json:"id"`
-	OwnerID   string    `json:"owner_id"`             // ID del profesor
+	OwnerID   string    `json:"owner_id"`             // Professor ID
 	SubjectID *string   `json:"subject_id,omitempty"` // Puntero porque en SQL permite NULL
 	Title     string    `json:"title"`
 	Type      string    `json:"type"` // 'tutoring', 'deadline', 'exam', 'other'
