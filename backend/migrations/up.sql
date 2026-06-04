@@ -151,3 +151,16 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 
 CREATE INDEX IF NOT EXISTS idx_calendar_owner     ON calendar_events(owner_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_starts_at ON calendar_events(starts_at);
+
+
+-- Tutoring Bookings (student reserves a tutoring slot)
+CREATE TABLE IF NOT EXISTS tutoring_bookings (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id   UUID NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status     VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending', 'confirmed', 'cancelled'
+    booked_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(event_id, student_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tutoring_event ON tutoring_bookings(event_id);

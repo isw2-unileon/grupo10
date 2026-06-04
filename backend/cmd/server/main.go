@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/isw2-unileon/grupo10/backend/internal/calendar"
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 	_ "github.com/lib/pq"
 )
@@ -54,6 +55,7 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(db))
 	registerUserRoutes(mux, db)
+	registerCalendarRoutes(mux, db)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -84,6 +86,14 @@ func registerUserRoutes(mux *http.ServeMux, db *sql.DB) {
 	issuer := users.NewJWTIssuer(secret, tokenTTL)
 	svc := users.NewService(repo, issuer)
 	users.NewHandler(svc, issuer).RegisterRoutes(mux)
+}
+
+// registerCalendarRoutes builds the calendar module and wires its HTTP endpoints.
+func registerCalendarRoutes(mux *http.ServeMux, db *sql.DB) {
+	repo := calendar.NewPostgresRepository(db)
+	svc := calendar.NewService(repo)
+	// Como CalendarHandler espera un Servicio, se lo pasamos
+	calendar.NewHandler(svc).RegisterRoutes(mux)
 }
 
 // runMigrations reads up.sql from disk and executes it against the database.
