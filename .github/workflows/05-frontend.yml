@@ -1,0 +1,75 @@
+# ==============================================================================
+# Workflow 05 — Frontend
+#
+# PURPOSE: The Go workflows (02/03/04) only cover the backend. This one does the
+# equivalent for the Vue 3 + Vite frontend living in `frontend/`: on every PR
+# that touches it, verify that the code lints, the unit tests pass and the
+# production build (including type-checking) succeeds.
+#
+# KEY CONCEPTS:
+#   - actions/setup-node    → Installs Node.js and caches the npm download cache
+#   - npm ci                → Clean, reproducible install from package-lock.json
+#   - Path filters          → Only run when frontend files actually change
+#   - defaults.working-dir  → Run every step inside `frontend/` without repeating
+# ==============================================================================
+
+name: 05 · Frontend
+
+on:
+  push:
+    #branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/05-frontend.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/05-frontend.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    # Every `run` step executes inside frontend/ so we don't repeat `cd frontend`.
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      # ── Step 1: Get the code ────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # ── Step 2: Install Node.js ─────────────────────────────────────────────
+      # Node 20 (current LTS) matches the docker-compose dev service and the
+      # @tsconfig/node20 base config. The npm cache is keyed on the lockfile so
+      # installs are fast on repeated runs.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Step 3: Install dependencies ────────────────────────────────────────
+      # `npm ci` installs exactly what package-lock.json pins (no surprises) and
+      # fails if the lockfile is out of sync.
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Step 4: Lint ────────────────────────────────────────────────────────
+      # Check-only (no --fix): the job fails if anything is wrong.
+      - name: Lint
+        run: npm run lint
+
+      # ── Step 5: Unit tests ──────────────────────────────────────────────────
+      - name: Run unit tests
+        run: npm run test
+
+      # ── Step 6: Build ───────────────────────────────────────────────────────
+      # `npm run build` runs vue-tsc (type-check) and then the Vite production
+      # build, catching type errors that the dev server tolerates.
+      - name: Build
+        run: npm run build
