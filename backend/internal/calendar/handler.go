@@ -40,7 +40,7 @@ type BookTutoringRequest struct {
 // ==========================================
 
 // CreateTutoringHandler maneja el POST /tutorings
-func (h *CalendarHandler) CreateTutoringHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTutoringHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Formato JSON inválido", http.StatusBadRequest) // 400
@@ -66,7 +66,7 @@ func (h *CalendarHandler) CreateTutoringHandler(w http.ResponseWriter, r *http.R
 }
 
 // ListTutoringsHandler maneja el GET /tutorings
-func (h *CalendarHandler) ListTutoringsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTutoringsHandler(w http.ResponseWriter, r *http.Request) {
 	events, err := h.svc.ListAvailableTutorings()
 	if err != nil {
 		http.Error(w, "Error al obtener las tutorías", http.StatusInternalServerError)
@@ -85,7 +85,7 @@ func (h *CalendarHandler) ListTutoringsHandler(w http.ResponseWriter, r *http.Re
 }
 
 // BookTutoringHandler maneja el POST /tutorings/book
-func (h *CalendarHandler) BookTutoringHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) BookTutoringHandler(w http.ResponseWriter, r *http.Request) {
 	var req BookTutoringRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Formato JSON inválido", http.StatusBadRequest)
@@ -104,7 +104,7 @@ func (h *CalendarHandler) BookTutoringHandler(w http.ResponseWriter, r *http.Req
 }
 
 // RegisterRoutes engancha los endpoints del calendario en el ServeMux principal
-func (h *CalendarHandler) RegisterRoutes(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tutorings", h.ListTutoringsHandler)
 	mux.HandleFunc("POST /api/tutorings", h.CreateTutoringHandler)
 	mux.HandleFunc("POST /api/tutorings/book", h.BookTutoringHandler)
