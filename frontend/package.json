@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "vue-tsc --noEmit",
-    "lint": "eslint . --ext .vue,.js,.ts,.cjs,.mjs --fix --ignore-path ../.gitignore"
+    "lint": "eslint . --ext .vue,.js,.ts,.cjs,.mjs --ignore-path ../.gitignore",
+    "lint:fix": "eslint . --ext .vue,.js,.ts,.cjs,.mjs --fix --ignore-path ../.gitignore"
   },
   "dependencies": {
     "pinia": "^2.1.7",
