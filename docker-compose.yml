@@ -62,6 +62,24 @@ services:
     networks:
       - platform_network
 
+  frontend:
+    image: node:20-alpine
+    container_name: learning_platform_frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${FRONTEND_PORT_HOST:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      # Proxy /api/* to the backend service inside the compose network.
+      - VITE_API_PROXY_TARGET=http://server:8080
+    depends_on:
+      - server
+    networks:
+      - platform_network
+
 networks:
   platform_network:
     driver: bridge
