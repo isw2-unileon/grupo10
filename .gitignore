@@ -1,0 +1,15 @@
+# Environment files — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Local database backups
+/backups/
+
+# Go build output
+/bin/
+*.exe
+
+# Test & coverage artifacts
+*.out
+coverage.*
