@@ -13,14 +13,15 @@ INSERT INTO roles (name) VALUES ('student'), ('teacher')
     ON CONFLICT DO NOTHING;
 
 -- Users
-CREATE TABLE IF NOT EXISTS users (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    role_id       UUID         NOT NULL REFERENCES roles(id),
-    name          VARCHAR(150) NOT NULL,
-    email         VARCHAR(255) NOT NULL UNIQUE,
-    password_hash TEXT         NOT NULL,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Y debajo ya tu código de creación, que será parecido a esto:
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_id VARCHAR(50) NOT NULL,    -- <--- AQUÍ ESTÁ EL CAMBIO CLAVE
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email);
