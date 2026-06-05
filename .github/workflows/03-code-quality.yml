@@ -88,6 +88,11 @@ jobs:
       - name: Run golangci-lint
         # Uses golangci-lint v2 (config in .golangci.yml, version: "2"). The
         # action major version must match: v9 supports the v2 linter line.
+        # `version: latest` keeps the linter built with a recent Go toolchain,
+        # so it can analyse modules whose go.mod targets newer Go releases
+        # (e.g. dependencies that require go 1.25). A pinned older build fails
+        # with "Go language version used to build golangci-lint is lower than
+        # the targeted Go version".
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.1.6
+          version: latest
