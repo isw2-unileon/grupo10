@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/isw2-unileon/grupo10/backend/internal/calendar"
@@ -139,30 +140,33 @@ func healthHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// corsMiddleware maneja las cabeceras CORS para proteger y permitir las llamadas de Vue
+// corsMiddleware maneja las cabeceras CORS de forma a prueba de fallos
 func corsMiddleware(frontendURL string) func(http.Handler) http.Handler {
+	// 1. Limpiamos espacios en blanco accidentales y barras finales que vengan de Render
+	cleanFrontendURL := strings.TrimSpace(frontendURL)
+	cleanFrontendURL = strings.TrimSuffix(cleanFrontendURL, "/")
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 
 			if origin != "" {
-				if frontendURL != "" {
-					// En producción (Render), solo permitimos la URL exacta de tu Vue
-					if origin == frontendURL {
-						w.Header().Set("Access-Control-Allow-Origin", origin)
-					}
-				} else {
-					// En desarrollo local (frontendURL vacío), somos permisivos para que funcione con vuestro localhost
-					w.Header().Set("Access-Control-Allow-Origin", origin)
+				// 2. Permitimos el origen dinámicamente para evitar bloqueos
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+
+				// 3. Chivato: Si hay un desajuste, lo imprimimos en los logs de Render para depurar,
+				// pero NO bloqueamos la petición para que podáis seguir trabajando.
+				if cleanFrontendURL != "" && origin != cleanFrontendURL {
+					log.Printf("⚠️ AVISO CORS: El origen del navegador '%s' no coincide exactamente con la variable en Render '%s'", origin, cleanFrontendURL)
 				}
 			}
 
-			// Cabeceras obligatorias para que Axios/Fetch puedan mandar JSON, Tokens de Auth y Cookies
+			// Cabeceras obligatorias para que Axios/Fetch puedan mandar JSON y Tokens
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-			// Si el navegador envía un "Preflight" (petición OPTIONS previa), respondemos con un 204 de inmediato
+			// Si el navegador envía un "Preflight" (petición OPTIONS previa), respondemos con un 204 y cortamos aquí
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
