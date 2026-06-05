@@ -57,11 +57,6 @@ func run() error {
 	registerUserRoutes(mux, db)
 	registerCalendarRoutes(mux, db)
 
-	// port := os.Getenv("PORT")
-	// if port == "" {
-	// 	port = "8080"
-	// }
-
 	// 1. LEEMOS LA VARIABLE
 	frontendURL := os.Getenv("FRONTEND_URL")
 	port := os.Getenv("PORT")
