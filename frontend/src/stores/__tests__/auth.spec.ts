@@ -46,4 +46,37 @@ describe('auth store', () => {
     expect(auth.isAuthenticated).toBe(false)
     expect(localStorage.getItem('token')).toBeNull()
   })
+
+  it('rehydrates the user from /api/me when a token is present', async () => {
+    const me = { id: 'uuid-1', email: 'student@unileon.es', role: 'student' }
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(me), { status: 200 }),
+    )
+    localStorage.setItem('token', 'jwt-token')
+
+    const auth = useAuthStore()
+    await auth.fetchMe()
+
+    const [url, options] = fetchSpy.mock.calls[0]
+    expect(url).toBe('/api/me')
+    // The stored token must be sent so the backend can identify the user.
+    const headers = new Headers(options!.headers)
+    expect(headers.get('Authorization')).toBe('Bearer jwt-token')
+    expect(auth.user?.email).toBe('student@unileon.es')
+  })
+
+  it('clears the session when /api/me rejects the token', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('unauthenticated', { status: 401 }),
+    )
+    localStorage.setItem('token', 'expired-token')
+
+    const auth = useAuthStore()
+    auth.$patch({ token: 'expired-token' })
+    await auth.fetchMe()
+
+    expect(auth.isAuthenticated).toBe(false)
+    expect(auth.user).toBeNull()
+    expect(localStorage.getItem('token')).toBeNull()
+  })
 })

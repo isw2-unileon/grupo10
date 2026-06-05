@@ -1,13 +1,30 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
+
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
+function onLogout() {
+  auth.logout()
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
   <header>
     <nav>
       <RouterLink to="/">Inicio</RouterLink>
-      <RouterLink to="/login">Iniciar sesión</RouterLink>
-      <RouterLink to="/register">Registrarse</RouterLink>
+      <template v-if="auth.isAuthenticated">
+        <button type="button" class="logout" @click="onLogout">
+          Cerrar sesión
+        </button>
+      </template>
+      <template v-else>
+        <RouterLink to="/login">Iniciar sesión</RouterLink>
+        <RouterLink to="/register">Registrarse</RouterLink>
+      </template>
     </nav>
   </header>
 
@@ -30,5 +47,15 @@ nav {
 
 nav a.router-link-active {
   font-weight: 600;
+}
+
+.logout {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
 }
 </style>

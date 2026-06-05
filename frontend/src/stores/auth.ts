@@ -50,11 +50,23 @@ export const useAuthStore = defineStore('auth', () => {
     setSession(payload)
   }
 
+  // GET /api/me → User. Rehydrates the account from the stored token, e.g.
+  // after a full page reload where only the token survives in localStorage.
+  // A rejected request means the token is missing, invalid or expired, so we
+  // clear the session to keep the UI consistent.
+  async function fetchMe() {
+    try {
+      user.value = await api.get<User>('/me')
+    } catch {
+      logout()
+    }
+  }
+
   function logout() {
     token.value = null
     user.value = null
     localStorage.removeItem('token')
   }
 
-  return { token, user, isAuthenticated, login, register, logout }
+  return { token, user, isAuthenticated, login, register, logout, fetchMe }
 })
