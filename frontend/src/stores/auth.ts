@@ -15,6 +15,16 @@ interface AuthResponse {
   user: User
 }
 
+// Roles seeded by the backend migrations. There is no "admin" role.
+export type Role = 'student' | 'teacher'
+
+export interface RegisterPayload {
+  name: string
+  email: string
+  password: string
+  role: Role
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
   const user = ref<User | null>(null)
@@ -34,8 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // POST /api/register → { token, user }
-  async function register(email: string, password: string) {
-    const payload = await api.post<AuthResponse>('/register', { email, password })
+  // The backend requires name, email, password and role (student | teacher).
+  async function register(input: RegisterPayload) {
+    const payload = await api.post<AuthResponse>('/register', input)
     setSession(payload)
   }
 
