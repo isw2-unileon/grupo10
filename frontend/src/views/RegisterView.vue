@@ -2,15 +2,17 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore, type Role } from '@/stores/auth'
 import type { ApiError } from '@/services/api'
 
 const auth = useAuthStore()
 const router = useRouter()
 
+const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const role = ref<Role>('student')
 const error = ref<string | null>(null)
 const loading = ref(false)
 
@@ -24,7 +26,12 @@ async function onSubmit() {
 
   loading.value = true
   try {
-    await auth.register(email.value, password.value)
+    await auth.register({
+      name: name.value,
+      email: email.value,
+      password: password.value,
+      role: role.value,
+    })
     // register() already stores the session, so go straight to Home.
     router.push({ name: 'home' })
   } catch (err) {
@@ -40,8 +47,19 @@ async function onSubmit() {
     <h1>Create account</h1>
     <form @submit.prevent="onSubmit">
       <label>
+        Name
+        <input v-model="name" type="text" required autocomplete="name" />
+      </label>
+      <label>
         Email
         <input v-model="email" type="email" required autocomplete="email" />
+      </label>
+      <label>
+        I am a
+        <select v-model="role" required>
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+        </select>
       </label>
       <label>
         Password
@@ -92,6 +110,12 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+select {
+  padding: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
 }
 
 .error {

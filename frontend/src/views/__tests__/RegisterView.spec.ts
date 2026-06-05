@@ -48,21 +48,31 @@ describe('RegisterView', () => {
   it('registers and redirects home when passwords match', async () => {
     const fakeResponse = {
       token: 'jwt-token',
-      user: { id: 'uuid-1', email: 'student@unileon.es', role: 'student' },
+      user: { id: 'uuid-1', email: 'teacher@unileon.es', role: 'teacher' },
     }
-    vi.spyOn(global, 'fetch').mockResolvedValue(
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(fakeResponse), { status: 201 }),
     )
     const wrapper = mountView()
 
-    await wrapper.find('input[type=email]').setValue('student@unileon.es')
+    await wrapper.find('input[type=text]').setValue('Ada Lovelace')
+    await wrapper.find('input[type=email]').setValue('teacher@unileon.es')
+    await wrapper.find('select').setValue('teacher')
     const passwords = wrapper.findAll('input[type=password]')
     await passwords[0].setValue('123456')
     await passwords[1].setValue('123456')
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/register', expect.anything())
+    // The backend requires all four fields; verify they are sent.
+    const [url, options] = fetchSpy.mock.calls[0]
+    expect(url).toBe('/api/register')
+    expect(JSON.parse(options!.body as string)).toEqual({
+      name: 'Ada Lovelace',
+      email: 'teacher@unileon.es',
+      password: '123456',
+      role: 'teacher',
+    })
     expect(push).toHaveBeenCalledWith({ name: 'home' })
     expect(localStorage.getItem('token')).toBe('jwt-token')
   })
