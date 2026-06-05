@@ -20,7 +20,7 @@ async function onSubmit() {
     await auth.login(email.value, password.value)
     router.push({ name: 'home' })
   } catch (err) {
-    error.value = (err as ApiError).message || 'Login failed'
+    error.value = (err as ApiError).message || 'No se pudo iniciar sesión'
   } finally {
     loading.value = false
   }
@@ -29,14 +29,14 @@ async function onSubmit() {
 
 <template>
   <section class="login">
-    <h1>Sign in</h1>
+    <h1>Iniciar sesión</h1>
     <form @submit.prevent="onSubmit">
       <label>
-        Email
+        Correo electrónico
         <input v-model="email" type="email" required autocomplete="email" />
       </label>
       <label>
-        Password
+        Contraseña
         <input
           v-model="password"
           type="password"
@@ -46,7 +46,7 @@ async function onSubmit() {
       </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="loading">
-        {{ loading ? 'Signing in…' : 'Sign in' }}
+        {{ loading ? 'Iniciando sesión…' : 'Iniciar sesión' }}
       </button>
     </form>
   </section>

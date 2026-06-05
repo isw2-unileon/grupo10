@@ -8,13 +8,13 @@ const auth = useAuthStore()
   <section class="home">
     <h1>Learning Platform</h1>
     <p>
-      Integrated platform to optimize student–teacher interaction using AI for
-      instant feedback on notes.
+      Plataforma integral para optimizar la interacción alumno–profesor
+      mediante IA, con feedback instantáneo sobre los apuntes.
     </p>
     <p v-if="auth.isAuthenticated">
-      Signed in as <strong>{{ auth.user?.email }}</strong>
+      Sesión iniciada como <strong>{{ auth.user?.email }}</strong>
     </p>
-    <p v-else>You are not signed in.</p>
+    <p v-else>No has iniciado sesión.</p>
   </section>
 </template>
 
