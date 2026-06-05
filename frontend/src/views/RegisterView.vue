@@ -20,7 +20,7 @@ async function onSubmit() {
   error.value = null
 
   if (password.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match'
+    error.value = 'Las contraseñas no coinciden'
     return
   }
 
@@ -35,7 +35,7 @@ async function onSubmit() {
     // register() already stores the session, so go straight to Home.
     router.push({ name: 'home' })
   } catch (err) {
-    error.value = (err as ApiError).message || 'Registration failed'
+    error.value = (err as ApiError).message || 'No se pudo crear la cuenta'
   } finally {
     loading.value = false
   }
@@ -44,25 +44,25 @@ async function onSubmit() {
 
 <template>
   <section class="register">
-    <h1>Create account</h1>
+    <h1>Crear cuenta</h1>
     <form @submit.prevent="onSubmit">
       <label>
-        Name
+        Nombre
         <input v-model="name" type="text" required autocomplete="name" />
       </label>
       <label>
-        Email
+        Correo electrónico
         <input v-model="email" type="email" required autocomplete="email" />
       </label>
       <label>
-        I am a
+        Soy
         <select v-model="role" required>
-          <option value="student">Student</option>
-          <option value="teacher">Teacher</option>
+          <option value="student">Estudiante</option>
+          <option value="teacher">Profesor</option>
         </select>
       </label>
       <label>
-        Password
+        Contraseña
         <input
           v-model="password"
           type="password"
@@ -72,7 +72,7 @@ async function onSubmit() {
         />
       </label>
       <label>
-        Confirm password
+        Confirmar contraseña
         <input
           v-model="confirmPassword"
           type="password"
@@ -83,12 +83,12 @@ async function onSubmit() {
       </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="loading">
-        {{ loading ? 'Creating account…' : 'Create account' }}
+        {{ loading ? 'Creando cuenta…' : 'Crear cuenta' }}
       </button>
     </form>
     <p class="alt">
-      Already have an account?
-      <RouterLink to="/login">Sign in</RouterLink>
+      ¿Ya tienes una cuenta?
+      <RouterLink to="/login">Iniciar sesión</RouterLink>
     </p>
   </section>
 </template>

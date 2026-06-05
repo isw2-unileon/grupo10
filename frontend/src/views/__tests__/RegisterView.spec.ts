@@ -40,7 +40,7 @@ describe('RegisterView', () => {
     await passwords[1].setValue('654321')
     await wrapper.find('form').trigger('submit.prevent')
 
-    expect(wrapper.find('.error').text()).toBe('Passwords do not match')
+    expect(wrapper.find('.error').text()).toBe('Las contraseñas no coinciden')
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalled()
   })
