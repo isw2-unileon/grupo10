@@ -46,3 +46,18 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # ── npm (frontend) ──────────────────────────────────────────────────────────
+  # The Vue 3 + Vite frontend manages its own dependencies in frontend/package.json.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
