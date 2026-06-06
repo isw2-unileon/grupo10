@@ -3,6 +3,7 @@ package users
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 )
 
@@ -115,6 +116,7 @@ func writeError(w http.ResponseWriter, err error) {
 		// A valid token whose user no longer exists is treated as unauthenticated.
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "user no longer exists"})
 	default:
+		log.Printf("🚨 ERROR INTERNO (500) ATRAPADO: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}
 }
