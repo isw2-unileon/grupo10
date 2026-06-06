@@ -164,3 +164,42 @@ CREATE TABLE IF NOT EXISTS tutoring_bookings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tutoring_event ON tutoring_bookings(event_id);
+
+-- ============================================================
+-- Teacher groups (ADR-002): a class group with an email-based
+-- student roster. Membership is resolved by matching the email,
+-- so students who have not signed up yet can already be listed.
+-- ============================================================
+
+-- A class group owned by a teacher.
+CREATE TABLE IF NOT EXISTS class_groups (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       VARCHAR(200) NOT NULL,
+    owner_id   UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_class_groups_owner ON class_groups(owner_id);
+
+-- Student roster, keyed by email (always stored as lower(trim(email))).
+CREATE TABLE IF NOT EXISTS group_members (
+    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id  UUID         NOT NULL REFERENCES class_groups(id) ON DELETE CASCADE,
+    email     VARCHAR(255) NOT NULL,
+    added_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE(group_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_members_email ON group_members(email);
+
+-- Tasks posted to a group (view-only for students in v1).
+CREATE TABLE IF NOT EXISTS group_tasks (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id    UUID         NOT NULL REFERENCES class_groups(id) ON DELETE CASCADE,
+    title       VARCHAR(300) NOT NULL,
+    description TEXT,
+    due_at      TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_tasks_group ON group_tasks(group_id);

@@ -3,6 +3,10 @@
 -- Order matters: children before parents
 -- ============================================================
 
+DROP TABLE IF EXISTS group_tasks;
+DROP TABLE IF EXISTS group_members;
+DROP TABLE IF EXISTS class_groups;
+DROP TABLE IF EXISTS tutoring_bookings;
 DROP TABLE IF EXISTS calendar_events;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS ai_feedback_logs;

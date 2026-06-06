@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/isw2-unileon/grupo10/backend/internal/calendar"
+	"github.com/isw2-unileon/grupo10/backend/internal/groups"
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 	_ "github.com/lib/pq"
 )
@@ -55,8 +56,11 @@ func run() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(db))
-	registerUserRoutes(mux, db)
+	// The JWT issuer is shared so every module validates tokens the same way.
+	issuer := users.NewJWTIssuer(jwtSecret(), tokenTTL)
+	registerUserRoutes(mux, db, issuer)
 	registerCalendarRoutes(mux, db)
+	registerGroupRoutes(mux, db, issuer)
 
 	// 1. LEEMOS LA VARIABLE
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -79,19 +83,30 @@ func run() error {
 	return srv.ListenAndServe()
 }
 
-// registerUserRoutes builds the users module and wires its HTTP endpoints.
-func registerUserRoutes(mux *http.ServeMux, db *sql.DB) {
+// jwtSecret reads the signing secret, falling back to an insecure development
+// value when JWT_SECRET is not set.
+func jwtSecret() string {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		log.Println("WARNING: JWT_SECRET is not set, using an insecure development secret")
 		//nolint:gosec // G101: not a real credential, just a dev fallback; production reads JWT_SECRET from the env
 		secret = "dev-insecure-secret"
 	}
+	return secret
+}
 
+// registerUserRoutes builds the users module and wires its HTTP endpoints.
+func registerUserRoutes(mux *http.ServeMux, db *sql.DB, issuer *users.JWTIssuer) {
 	repo := users.NewPostgresRepository(db)
-	issuer := users.NewJWTIssuer(secret, tokenTTL)
 	svc := users.NewService(repo, issuer)
 	users.NewHandler(svc, issuer).RegisterRoutes(mux)
+}
+
+// registerGroupRoutes builds the groups module and wires its HTTP endpoints.
+func registerGroupRoutes(mux *http.ServeMux, db *sql.DB, parser users.TokenParser) {
+	repo := groups.NewPostgresRepository(db)
+	svc := groups.NewService(repo)
+	groups.NewHandler(svc, parser).RegisterRoutes(mux)
 }
 
 // registerCalendarRoutes builds the calendar module and wires its HTTP endpoints.
