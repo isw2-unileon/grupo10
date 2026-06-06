@@ -203,3 +203,5 @@ CREATE TABLE IF NOT EXISTS group_tasks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_tasks_group ON group_tasks(group_id);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
