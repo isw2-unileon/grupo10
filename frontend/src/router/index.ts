@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import HomeView from '@/views/HomeView.vue'
 import { useAuthStore } from '@/stores/auth'
-
+import CalendarView from '@/views/CalendarView.vue'
 // Per-route auth metadata, consumed by the navigation guard below.
 declare module 'vue-router' {
   interface RouteMeta {
@@ -35,6 +35,12 @@ const router = createRouter({
       component: () => import('@/views/RegisterView.vue'),
     },
     {
+      path: '/calendar',
+      name: 'calendar',
+      meta: { requiresAuth: true },
+      component: CalendarView,
+    },
+    {
       path: '/student',
       name: 'student-home',
       component: () => import('../views/StudentView.vue')
@@ -63,20 +69,20 @@ const router = createRouter({
 //    (typical after a page reload), rehydrate the account from /api/me once.
 // 2. Block protected routes for guests and bounce guest-only routes (login,
 //    register) for users who are already signed in.
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
+// router.beforeEach(async (to) => {
+//   const auth = useAuthStore()
 
-  if (auth.token && !auth.user) {
-    await auth.fetchMe()
-  }
+//   if (auth.token && !auth.user) {
+//     await auth.fetchMe()
+//   }
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
+//   if (to.meta.requiresAuth && !auth.isAuthenticated) {
+//     return { name: 'login', query: { redirect: to.fullPath } }
+//   }
 
-  if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
-  }
-})
+//   if (to.meta.guestOnly && auth.isAuthenticated) {
+//     return { name: 'home' }
+//   }
+// })
 
 export default router

@@ -27,12 +27,12 @@ const userName = auth.user?.email.split('@')[0] || 'Estudiante'
         </div>
       </article>
 
-      <article class="tool-card disabled">
+      <article class="tool-card ">
         <div class="tool-icon">📅</div>
         <div class="tool-info">
           <h2>Tutorías (Próximamente)</h2>
           <p>Reserva horarios con tus profesores para resolver dudas específicas de la asignatura.</p>
-          <button disabled class="btn-disabled">No disponible aún</button>
+          <RouterLink to="/calendar" class="btn-action teacher-btn">Gestionar Calendario</RouterLink>
         </div>
       </article>
     </div>

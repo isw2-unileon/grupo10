@@ -17,6 +17,10 @@
     "lint:fix": "eslint . --ext .vue,.js,.ts,.cjs,.mjs --fix --ignore-path ../.gitignore"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/vue3": "^6.1.20",
     "pinia": "^2.1.7",
     "vue": "^3.4.27",
     "vue-router": "^4.3.2"

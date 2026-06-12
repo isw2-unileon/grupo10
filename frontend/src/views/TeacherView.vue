@@ -19,11 +19,11 @@ const auth = useAuthStore()
         <RouterLink to="/teacher/dashboard" class="btn-action teacher-btn">Ver Apuntes Pendientes</RouterLink>
       </section>
 
-      <section class="feature-card disabled">
+      <section class="feature-card ">
         <div class="icon">📅</div>
         <h2>Gestión de Tutorías</h2>
         <p>Publica franjas horarias libres en tu calendario para que los alumnos puedan reservar citas contigo.</p>
-        <button disabled class="btn-disabled">Próximamente</button>
+        <RouterLink to="/calendar" class="btn-action teacher-btn">Gestionar Calendario</RouterLink>
       </section>
     </div>
   </div>
