@@ -13,6 +13,7 @@ import (
 
 	"github.com/isw2-unileon/grupo10/backend/internal/calendar"
 	"github.com/isw2-unileon/grupo10/backend/internal/groups"
+	"github.com/isw2-unileon/grupo10/backend/internal/notes"
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 	_ "github.com/lib/pq"
 )
@@ -30,8 +31,6 @@ func main() {
 	}
 }
 
-// run wires up the server and blocks until it stops. Returning an error instead
-// of calling log.Fatal directly lets deferred cleanup (db.Close) run on exit.
 func run() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -49,26 +48,30 @@ func run() error {
 	}
 	log.Println("Successfully connected to the database")
 
-	// Run migrations automatically on startup.
 	if err := runMigrations(db); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler(db))
+
 	// The JWT issuer is shared so every module validates tokens the same way.
 	issuer := users.NewJWTIssuer(jwtSecret(), tokenTTL)
+
+	// Registramos todos los módulos
 	registerUserRoutes(mux, db, issuer)
 	registerCalendarRoutes(mux, db)
 	registerGroupRoutes(mux, db, issuer)
+	registerNotesRoutes(mux, db, issuer) // <-- NUEVO: Registramos las rutas de notas pasándole el parser de JWT
 
-	// 1. LEEMOS LA VARIABLE
+	//1. LEEMOS LA VARIABLE
 	frontendURL := os.Getenv("FRONTEND_URL")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	// 2. ENVOLVER EL MUX CON EL MIDDLEWARE DE CORS
+
+	//2. ENVOLVER EL MUX CON EL MIDDLEWARE DE CORS
 	// Aplicamos el control de accesos cruzados pasándole la URL de tu frontend
 	handlerWithCORS := corsMiddleware(frontendURL)(mux)
 
@@ -83,62 +86,58 @@ func run() error {
 	return srv.ListenAndServe()
 }
 
-// jwtSecret reads the signing secret, falling back to an insecure development
-// value when JWT_SECRET is not set.
 func jwtSecret() string {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		log.Println("WARNING: JWT_SECRET is not set, using an insecure development secret")
-		//nolint:gosec // G101: not a real credential, just a dev fallback; production reads JWT_SECRET from the env
+		//nolint:gosec
 		secret = "dev-insecure-secret"
 	}
 	return secret
 }
 
-// registerUserRoutes builds the users module and wires its HTTP endpoints.
 func registerUserRoutes(mux *http.ServeMux, db *sql.DB, issuer *users.JWTIssuer) {
 	repo := users.NewPostgresRepository(db)
 	svc := users.NewService(repo, issuer)
 	users.NewHandler(svc, issuer).RegisterRoutes(mux)
 }
 
-// registerGroupRoutes builds the groups module and wires its HTTP endpoints.
 func registerGroupRoutes(mux *http.ServeMux, db *sql.DB, parser users.TokenParser) {
 	repo := groups.NewPostgresRepository(db)
 	svc := groups.NewService(repo)
 	groups.NewHandler(svc, parser).RegisterRoutes(mux)
 }
 
-// registerCalendarRoutes builds the calendar module and wires its HTTP endpoints.
 func registerCalendarRoutes(mux *http.ServeMux, db *sql.DB) {
 	repo := calendar.NewPostgresRepository(db)
 	svc := calendar.NewService(repo)
-	// Como CalendarHandler espera un Servicio, se lo pasamos
 	calendar.NewHandler(svc).RegisterRoutes(mux)
 }
 
-// runMigrations reads up.sql from disk and executes it against the database.
+// NUEVO: Función para ensamblar el módulo de apuntes y protegerlo con JWT
+func registerNotesRoutes(mux *http.ServeMux, db *sql.DB, parser users.TokenParser) {
+	repo := notes.NewPostgresRepository(db)
+	svc := notes.NewService(repo)
+	// Pasamos el middleware RequireAuth para que todos los endpoints de notas estén protegidos
+	notes.NewHandler(svc).RegisterRoutes(mux, users.RequireAuth(parser))
+}
+
 func runMigrations(db *sql.DB) error {
 	log.Println("Running migrations...")
-
 	migration, err := os.ReadFile("migrations/up.sql")
 	if err != nil {
 		return err
 	}
-
 	if _, err := db.Exec(string(migration)); err != nil {
 		return err
 	}
-
 	log.Println("Migrations applied successfully")
 	return nil
 }
 
-// healthHandler returns 200 if the server and DB are up.
 func healthHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
 		if err := db.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{
@@ -147,46 +146,32 @@ func healthHandler(db *sql.DB) http.HandlerFunc {
 			})
 			return
 		}
-
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
-		})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }
 
-// corsMiddleware maneja las cabeceras CORS de forma a prueba de fallos
 func corsMiddleware(frontendURL string) func(http.Handler) http.Handler {
-	// 1. Limpiamos espacios en blanco accidentales y barras finales que vengan de Render
 	cleanFrontendURL := strings.TrimSpace(frontendURL)
 	cleanFrontendURL = strings.TrimSuffix(cleanFrontendURL, "/")
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-
 			if origin != "" {
-				// 2. Permitimos el origen dinámicamente para evitar bloqueos
 				w.Header().Set("Access-Control-Allow-Origin", origin)
-
-				// 3. Chivato: Si hay un desajuste, lo imprimimos en los logs de Render para depurar,
-				// pero NO bloqueamos la petición para que podáis seguir trabajando.
 				if cleanFrontendURL != "" && origin != cleanFrontendURL {
-					log.Printf("⚠️ AVISO CORS: El origen del navegador '%s' no coincide exactamente con la variable en Render '%s'", origin, cleanFrontendURL)
+					log.Printf("⚠️ AVISO CORS: El origen '%s' no coincide exactamente con '%s'", origin, cleanFrontendURL)
 				}
 			}
-
-			// Cabeceras obligatorias para que Axios/Fetch puedan mandar JSON y Tokens
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-			// Si el navegador envía un "Preflight" (petición OPTIONS previa), respondemos con un 204 y cortamos aquí
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-
 			next.ServeHTTP(w, r)
 		})
 	}
