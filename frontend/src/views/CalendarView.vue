@@ -12,27 +12,33 @@
 import { ref, onMounted } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
-// 1. Importamos el nuevo plugin para poder hacer clic
-import interactionPlugin from '@fullcalendar/interaction' 
+import interactionPlugin from '@fullcalendar/interaction'
+// 1. Importamos la tienda del usuario de tu compi
+import { useAuthStore } from '@/stores/auth' 
 
-// 2. Creamos la función que se dispara al hacer clic en un día
+// 2. Inicializamos la tienda
+const auth = useAuthStore()
+
 const alHacerClicEnUnDia = async (info: any) => {
-  // Sacamos un pop-up nativo del navegador pidiendo el título
+  // 3. ¡EL GUARDIA DE SEGURIDAD! Si no es profe, lo echamos.
+  if (auth.user?.role !== 'teacher') {
+    alert("¡Quieto ahí! Solo los profesores pueden crear tutorías. 🛑")
+    return
+  }
+
   const titulo = prompt(`¿Qué tutoría quieres crear para el día ${info.dateStr}?`)
   
-  // Si el usuario le da a cancelar o no escribe nada, salimos
   if (!titulo) return
 
-  // Si escribió algo, preparamos el paquete para Go (igual que tu curl)
+  // 4. Usamos el ID REAL del profesor que ha iniciado sesión
   const nuevoEvento = {
-    owner_id: "2f51085c-16f7-4d74-b97c-4fb23e2d13c1", // Tu UUID real robado
+    owner_id: auth.user.id, // <-- ¡Adiós al UUID robado!
     title: titulo,
-    starts_at: info.dateStr + "T10:00:00Z", // Le ponemos las 10:00 por defecto
-    ends_at: info.dateStr + "T11:00:00Z"    // Y que acabe a las 11:00
+    starts_at: info.dateStr + "T10:00:00Z",
+    ends_at: info.dateStr + "T11:00:00Z"
   }
 
   try {
-    // 3. Hacemos el POST desde Vue (lo que hacía tu curl)
     const response = await fetch('/api/tutorings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +46,6 @@ const alHacerClicEnUnDia = async (info: any) => {
     })
 
     if (response.ok) {
-      // 4. Si Go dice que OK, volvemos a pedir los eventos para que se refresque la pantalla
       cargarEventosDeBD()
     } else {
       alert("Error al crear la tutoría en el servidor")
@@ -49,15 +54,55 @@ const alHacerClicEnUnDia = async (info: any) => {
     console.error("Error de conexión:", error)
   }
 }
+const alHacerClicEnUnEvento = async (info: any) => {
+  // 1. ¡Control de seguridad! Solo los alumnos reservan
+  if (auth.user?.role !== 'student') {
+    alert("Los profesores no pueden reservar tutorías, ¡que son los que las dan! 👨‍🏫")
+    return
+  }
+
+  
+
+  // 2. Preguntamos confirmación al alumno
+  const confirmar = confirm(`¿Quieres reservar la tutoría "${info.event.title}"?`)
+  if (!confirmar) return
+
+  // 3. Preparamos los datos para el endpoint de reservar que hizo tu compi
+  const datosReserva = {
+    event_id: info.event.id,  // El ID de la tutoría que viene de la BD
+    student_id: auth.user.id     // El ID del alumno logueado
+  }
+
+  try {
+    // 4. Lanzamos la petición POST a /book
+    const response = await fetch('/api/tutorings/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datosReserva)
+    })
+
+    if (response.ok) {
+      alert("¡Tutoría reservada con éxito! 📅🎉")
+      // Refrescamos el calendario para que se vean los cambios
+      cargarEventosDeBD()
+    } else {
+      const errorData = await response.json().catch(() => ({}))
+      alert(errorData.message || "Error al procesar la reserva en el servidor")
+    }
+  } catch (error) {
+    console.error("Error al conectar con el servidor:", error)
+  }
+}
 
 // 5. Añadimos el plugin y el evento click a la configuración del calendario
 const calendarOptions = ref({
-  plugins: [dayGridPlugin, interactionPlugin], // <-- Añadimos el plugin aquí
+  plugins: [dayGridPlugin, interactionPlugin],
   initialView: 'dayGridMonth',
   events: [],
   locale: 'es',
   firstDay: 1,
-  dateClick: alHacerClicEnUnDia,               // <-- Le enchufamos nuestra función
+  dateClick: alHacerClicEnUnDia,       
+  eventClick: alHacerClicEnUnEvento,   
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
