@@ -72,15 +72,16 @@ EXCEPTION
 END $$;
 
 CREATE TABLE IF NOT EXISTS notes (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    author_id   UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subject_id  UUID        NOT NULL REFERENCES subjects(id),
-    title       VARCHAR(300) NOT NULL,
-    content     TEXT         NOT NULL,
-    status      note_status  NOT NULL DEFAULT 'draft',
-    ai_feedback TEXT,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    author_id        UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subject_id       UUID         REFERENCES subjects(id), -- Le quitamos el NOT NULL
+    title            VARCHAR(300) NOT NULL,
+    content          TEXT         NOT NULL,
+    status           note_status  NOT NULL DEFAULT 'draft',
+    ai_feedback      TEXT,
+    teacher_feedback TEXT,        -- Añadimos la columna para el profesor
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_author  ON notes(author_id);

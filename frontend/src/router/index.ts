@@ -34,6 +34,26 @@ const router = createRouter({
       meta: { guestOnly: true },
       component: () => import('@/views/RegisterView.vue'),
     },
+    {
+      path: '/student',
+      name: 'student-home',
+      component: () => import('../views/StudentView.vue')
+    },
+    {
+      path: '/teacher',
+      name: 'teacher-home',
+      component: () => import('../views/TeacherView.vue')
+    },
+    {
+      path: '/teacher/dashboard',
+      name: 'teacher-dashboard',
+      component: () => import('@/views/TeacherDashboard.vue')
+    },
+    {
+      path: '/student/notes',
+      name: 'student-notes',
+      component: () => import('../views/StudentNotes.vue')
+    }
   ],
 })
 
