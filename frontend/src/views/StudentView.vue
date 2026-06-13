@@ -30,9 +30,19 @@ const userName = auth.user?.email.split('@')[0] || 'Estudiante'
       <article class="tool-card ">
         <div class="tool-icon">📅</div>
         <div class="tool-info">
-          <h2>Tutorías (Próximamente)</h2>
+          <h2>Tutorías </h2>
           <p>Reserva horarios con tus profesores para resolver dudas específicas de la asignatura.</p>
           <RouterLink to="/calendar" class="btn-action teacher-btn">Gestionar Calendario</RouterLink>
+        </div>
+      </article>
+      <article class="tool-card">
+        <div class="tool-icon">👥</div>
+        <div class="tool-info">
+          <h2>Mis Asignaturas</h2>
+          <p>Consulta las asignaturas que perteneces y accede a las tareas asignadas por tus profesores.</p>
+          <RouterLink to="/student/groups" class="btn-primary">
+            Ver Mis Grupos
+          </RouterLink>
         </div>
       </article>
     </div>

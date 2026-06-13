@@ -25,6 +25,13 @@ const auth = useAuthStore()
         <p>Publica franjas horarias libres en tu calendario para que los alumnos puedan reservar citas contigo.</p>
         <RouterLink to="/calendar" class="btn-action teacher-btn">Gestionar Calendario</RouterLink>
       </section>
+
+      <section class="feature-card">
+        <div class="icon">👥</div>
+        <h2>Gestionar Asignaturas</h2>
+        <p>Administra los asignaturas a las que das clases y asigna tareas.</p>
+        <RouterLink to="/teacher/groups" class="btn-action teacher-btn">Gestionar asignaturas</RouterLink>
+      </section>
     </div>
   </div>
 </template>
