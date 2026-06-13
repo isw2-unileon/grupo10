@@ -59,6 +59,26 @@ const router = createRouter({
       path: '/student/notes',
       name: 'student-notes',
       component: () => import('../views/StudentNotes.vue')
+    },
+    {
+      path: '/teacher/groups',
+      name: 'TeacherGroups',
+      component: () => import('../views/TeacherGroupsView.vue')
+    },
+    {
+      path: '/student/groups',
+      name: 'StudentGroups',
+      component: () => import('../views/StudentGroupsView.vue')
+    },
+    {
+      path: '/teacher/groups/:id',
+      name: 'TeacherGroupDetail',
+      component: () => import('../views/TeacherGroupDetailView.vue')
+    },
+    {
+      path: '/student/groups/:id/tasks',
+      name: 'StudentGroupTasks',
+      component: () => import('../views/StudentGroupTaskView.vue')
     }
   ],
 })
