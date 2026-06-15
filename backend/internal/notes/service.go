@@ -11,15 +11,17 @@ import (
 	"os"
 )
 
-// Service contiene la lógica de negocio de los apuntes
+// Service contiene la lógica de negocio de los apuntes.
 type Service struct {
 	repo Repository
 }
 
+// NewService inicializa un nuevo servicio de apuntes.
 func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
+// CreateNote procesa la creación de un nuevo apunte.
 func (s *Service) CreateNote(ctx context.Context, authorID string, title, content string) (*Note, error) {
 	n := &Note{
 		AuthorID:  authorID,
@@ -32,24 +34,22 @@ func (s *Service) CreateNote(ctx context.Context, authorID string, title, conten
 	return n, err
 }
 
+// GetNotesByAuthor recupera el listado de apuntes de un alumno.
 func (s *Service) GetNotesByAuthor(ctx context.Context, authorID string) ([]Note, error) {
 	return s.repo.GetByAuthor(ctx, authorID)
 }
 
+// UpdateNote procesa la modificación manual de un apunte.
 func (s *Service) UpdateNote(ctx context.Context, id, authorID, title, content string) error {
 	n := &Note{ID: id, AuthorID: authorID, Title: title, Content: content}
 	return s.repo.UpdateNote(ctx, n)
 }
 
+// DeleteNote procesa el borrado seguro de un apunte.
 func (s *Service) DeleteNote(ctx context.Context, id, authorID string) error {
 	return s.repo.DeleteNote(ctx, id, authorID)
 }
 
-// ==========================================
-// ESTRUCTURAS PARA LA API DE LA IA (GROQ/OPENAI)
-// ==========================================
-
-// Groq usa exactamente el mismo formato JSON que OpenAI, así que reutilizamos las estructuras
 type openAIRequest struct {
 	Model    string      `json:"model"`
 	Messages []openAIMsg `json:"messages"`
@@ -66,38 +66,37 @@ type openAIResponse struct {
 	} `json:"choices"`
 }
 
-// ==========================================
-// LÓGICA DE REVISIÓN CON IA
-// ==========================================
-
+// RequestAIReview envía el contenido a la IA para generar sugerencias de mejora.
 func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) error {
-	// 1. Leemos nuestra clave gratuita de Groq
 	apiKey := os.Getenv("GROQ_API_KEY")
 	if apiKey == "" {
 		return errors.New("no hay clave de API configurada para la IA (Groq)")
 	}
 
-	// 2. El Prompt: Qué queremos que haga la IA
-	prompt := "Eres un profesor estricto pero amable. Corrige estos apuntes, señala errores ortográficos, " +
+	prompt := "Eres un docente estricto pero amable. Corrige estos apuntes, señala errores ortográficos, " +
 		"conceptuales y sugiere mejoras. Sé conciso y devuelve el texto bien formateado. Apuntes a corregir:\n\n" + content
 
-	// 3. Montamos la petición
 	reqBody := openAIRequest{
-		Model: "llama-3.3-70b-versatile", // Modelo de Meta: Rápido, ligero y gratuito en Groq
+		Model: "llama-3.3-70b-versatile",
 		Messages: []openAIMsg{
-			{Role: "system", Content: "Eres un tutor educativo de alto nivel que corrige apuntes. Responde siempre en español."},
+			{Role: "system", Content: "Eres un tutor educativo de alto nivel. Responde siempre en español y sé muy conciso en tu respuesta."},
 			{Role: "user", Content: prompt},
 		},
 	}
 
-	jsonData, _ := json.Marshal(reqBody)
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("error al empaquetar JSON: %w", err)
+	}
 
-	// 4. Llamamos a la API de Groq
-	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("error al crear petición HTTP: %w", err)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	// 5. Enviamos la petición
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -110,7 +109,6 @@ func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) e
 		return fmt.Errorf("la IA devolvió un error (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	// 6. Procesamos la respuesta
 	var aiResp openAIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
 		return errors.New("error leyendo respuesta de la IA")
@@ -122,19 +120,21 @@ func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) e
 
 	feedback := aiResp.Choices[0].Message.Content
 
-	// 7. Guardamos en Postgres
 	log := &AIFeedbackLog{NoteID: noteID, PromptUsed: prompt, Response: feedback}
 	return s.repo.UpdateNoteWithAI(ctx, noteID, feedback, log)
 }
 
+// SubmitForApproval marca el apunte como pendiente para el docente(professor).
 func (s *Service) SubmitForApproval(ctx context.Context, noteID string) error {
 	return s.repo.UpdateStatus(ctx, noteID, StatusPending)
 }
 
+// GetPendingForTeacher obtiene los apuntes que requieren revisión.
 func (s *Service) GetPendingForTeacher(ctx context.Context) ([]Note, error) {
 	return s.repo.GetPending(ctx)
 }
 
+// ApproveNoteWithFeedback procesa la corrección del docente(professor).
 func (s *Service) ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error {
 	return s.repo.ApproveNoteWithFeedback(ctx, noteID, feedback)
 }

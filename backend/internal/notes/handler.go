@@ -1,16 +1,23 @@
 package notes
 
 import (
+	"archive/zip"
 	"encoding/json"
+	"encoding/xml"
+	"errors"
+	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 )
 
+// Handler maneja las peticiones HTTP de los apuntes.
 type Handler struct {
 	svc *Service
 }
 
+// NewHandler crea un nuevo Handler con el servicio de apuntes.
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
@@ -24,6 +31,7 @@ type feedbackRequest struct {
 	Feedback string `json:"feedback"`
 }
 
+// RegisterRoutes registra todos los endpoints del módulo de apuntes.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler) {
 	mux.Handle("GET /api/notes", authMiddleware(http.HandlerFunc(h.listNotes)))
 	mux.Handle("POST /api/notes", authMiddleware(http.HandlerFunc(h.createNote)))
@@ -32,12 +40,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, authMiddleware func(http.Ha
 
 	mux.Handle("POST /api/notes/{id}/ai-review", authMiddleware(http.HandlerFunc(h.aiReview)))
 	mux.Handle("POST /api/notes/{id}/submit", authMiddleware(http.HandlerFunc(h.submitNote)))
+	mux.Handle("POST /api/notes/upload", authMiddleware(http.HandlerFunc(h.uploadNote)))
 
 	mux.Handle("GET /api/teacher/notes/pending", authMiddleware(http.HandlerFunc(h.listPending)))
 	mux.Handle("POST /api/notes/{id}/approve", authMiddleware(http.HandlerFunc(h.approveNote)))
 }
 
-// Función auxiliar para sacar el ID real del usuario desde el JWT Token
 func getUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	authorID, ok := users.UserIDFromContext(r.Context())
 	if !ok {
@@ -164,4 +172,99 @@ func (h *Handler) approveNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) uploadNote(w http.ResponseWriter, r *http.Request) {
+	authorID, ok := getUserID(w, r)
+	if !ok {
+		return
+	}
+
+	//nolint:gosec // Limitamos a 10MB por seguridad para no agotar la memoria.
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Archivo demasiado grande o formato inválido", http.StatusBadRequest)
+		return
+	}
+
+	title := r.FormValue("title")
+	if title == "" {
+		title = "Documento Importado"
+	}
+
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error al leer el archivo", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	content, err := extractTextFromDocx(file, fileHeader.Size)
+	if err != nil {
+		http.Error(w, "No se pudo procesar el Word. Asegúrate de que es un .docx válido: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	note, err := h.svc.CreateNote(r.Context(), authorID, title, content)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(note)
+}
+
+// extractTextFromDocx extrae el texto plano de un archivo ZIP/DOCX.
+//
+//nolint:gocognit // El parseo de XML requiere un switch anidado complejo.
+func extractTextFromDocx(file multipart.File, size int64) (string, error) {
+	zr, err := zip.NewReader(file, size)
+	if err != nil {
+		return "", err
+	}
+
+	var docFile *zip.File
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			docFile = f
+			break
+		}
+	}
+
+	if docFile == nil {
+		return "", errors.New("no se encontró la estructura de un documento Word")
+	}
+
+	rc, err := docFile.Open()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	decoder := xml.NewDecoder(rc)
+	var textBuilder strings.Builder
+
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			break // Terminamos de leer
+		}
+
+		switch element := token.(type) {
+		case xml.StartElement:
+			if element.Name.Local == "t" { // Etiqueta <w:t> (Texto)
+				var text string
+				if err := decoder.DecodeElement(&text, &element); err == nil {
+					textBuilder.WriteString(text)
+				}
+			}
+		case xml.EndElement:
+			if element.Name.Local == "p" { // Etiqueta </w:p> (Fin de párrafo)
+				textBuilder.WriteString("\n\n") // Añadimos saltos de línea para que quede bonito
+			}
+		}
+	}
+
+	return strings.TrimSpace(textBuilder.String()), nil
 }

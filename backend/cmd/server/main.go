@@ -64,14 +64,14 @@ func run() error {
 	registerGroupRoutes(mux, db, issuer)
 	registerNotesRoutes(mux, db, issuer) // <-- NUEVO: Registramos las rutas de notas pasándole el parser de JWT
 
-	//1. LEEMOS LA VARIABLE
+	// 1. LEEMOS LA VARIABLE
 	frontendURL := os.Getenv("FRONTEND_URL")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	//2. ENVOLVER EL MUX CON EL MIDDLEWARE DE CORS
+	// 2. ENVOLVER EL MUX CON EL MIDDLEWARE DE CORS
 	// Aplicamos el control de accesos cruzados pasándole la URL de tu frontend
 	handlerWithCORS := corsMiddleware(frontendURL)(mux)
 
