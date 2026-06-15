@@ -6,8 +6,10 @@ import (
 	"errors"
 )
 
+// ErrNoteNotFound se devuelve cuando un apunte no existe en la base de datos.
 var ErrNoteNotFound = errors.New("apunte no encontrado")
 
+// Repository define las operaciones de base de datos para los apuntes.
 type Repository interface {
 	CreateNote(ctx context.Context, note *Note) error
 	GetByAuthor(ctx context.Context, authorID string) ([]Note, error)
@@ -20,14 +22,17 @@ type Repository interface {
 	ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error
 }
 
+// PostgresRepository implementa la interfaz Repository usando PostgreSQL.
 type PostgresRepository struct {
 	db *sql.DB
 }
 
+// NewPostgresRepository crea una nueva instancia de PostgresRepository.
 func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
+// CreateNote inserta un nuevo apunte en la base de datos.
 func (r *PostgresRepository) CreateNote(ctx context.Context, n *Note) error {
 	query := `
 		INSERT INTO notes (author_id, subject_id, title, content, status)
@@ -37,6 +42,7 @@ func (r *PostgresRepository) CreateNote(ctx context.Context, n *Note) error {
 		Scan(&n.ID, &n.CreatedAt, &n.UpdatedAt)
 }
 
+// GetByAuthor obtiene todos los apuntes de un usuario específico.
 func (r *PostgresRepository) GetByAuthor(ctx context.Context, authorID string) ([]Note, error) {
 	query := `SELECT id, author_id, subject_id, title, content, status, ai_feedback, teacher_feedback, created_at, updated_at 
 	          FROM notes WHERE author_id = $1 ORDER BY updated_at DESC`
@@ -57,6 +63,7 @@ func (r *PostgresRepository) GetByAuthor(ctx context.Context, authorID string) (
 	return list, nil
 }
 
+// GetByID obtiene un apunte por su ID único.
 func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*Note, error) {
 	var n Note
 	query := `SELECT id, author_id, subject_id, title, content, status, ai_feedback FROM notes WHERE id = $1`
@@ -67,6 +74,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*Note, err
 	return &n, err
 }
 
+// UpdateNote modifica el título y el contenido de un apunte existente.
 func (r *PostgresRepository) UpdateNote(ctx context.Context, n *Note) error {
 	res, err := r.db.ExecContext(ctx, `UPDATE notes SET title = $1, content = $2, updated_at = NOW() WHERE id = $3 AND author_id = $4`, n.Title, n.Content, n.ID, n.AuthorID)
 	if err != nil {
@@ -79,17 +87,20 @@ func (r *PostgresRepository) UpdateNote(ctx context.Context, n *Note) error {
 	return nil
 }
 
+// UpdateStatus cambia únicamente el estado de un apunte.
 func (r *PostgresRepository) UpdateStatus(ctx context.Context, noteID string, status NoteStatus) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE notes SET status = $1, updated_at = NOW() WHERE id = $2`, status, noteID)
 	return err
 }
 
+// UpdateNoteWithAI guarda el feedback de la IA y actualiza el estado en una transacción.
 func (r *PostgresRepository) UpdateNoteWithAI(ctx context.Context, noteID, feedback string, log *AIFeedbackLog) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	// Usamos una función anónima para gestionar el error exigido por errcheck
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err = tx.ExecContext(ctx, `UPDATE notes SET status = $1, ai_feedback = $2, updated_at = NOW() WHERE id = $3`, StatusAiReviewed, feedback, noteID); err != nil {
 		return err
@@ -101,6 +112,7 @@ func (r *PostgresRepository) UpdateNoteWithAI(ctx context.Context, noteID, feedb
 	return tx.Commit()
 }
 
+// DeleteNote elimina un apunte de forma permanente.
 func (r *PostgresRepository) DeleteNote(ctx context.Context, id string, authorID string) error {
 	res, err := r.db.ExecContext(ctx, `DELETE FROM notes WHERE id = $1 AND author_id = $2`, id, authorID)
 	if err != nil {
@@ -113,6 +125,7 @@ func (r *PostgresRepository) DeleteNote(ctx context.Context, id string, authorID
 	return nil
 }
 
+// GetPending devuelve todos los apuntes que están pendientes de revisión.
 func (r *PostgresRepository) GetPending(ctx context.Context) ([]Note, error) {
 	query := `SELECT id, author_id, subject_id, title, content, status, ai_feedback, teacher_feedback, created_at, updated_at 
 	          FROM notes WHERE status = 'pending' ORDER BY created_at ASC`
@@ -133,6 +146,7 @@ func (r *PostgresRepository) GetPending(ctx context.Context) ([]Note, error) {
 	return list, nil
 }
 
+// ApproveNoteWithFeedback guarda la corrección del docente(professor) y aprueba el apunte.
 func (r *PostgresRepository) ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE notes SET status = 'approved', teacher_feedback = $1, updated_at = NOW() WHERE id = $2`, feedback, noteID)
 	return err
