@@ -31,16 +31,26 @@ type feedbackRequest struct {
 	Feedback string `json:"feedback"`
 }
 
+// ShareRequest representa la petición para compartir un apunte.
+type ShareRequest struct {
+	Email   *string `json:"email,omitempty"`
+	GroupID *string `json:"group_id,omitempty"`
+}
+
 // RegisterRoutes registra todos los endpoints del módulo de apuntes.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler) {
 	mux.Handle("GET /api/notes", authMiddleware(http.HandlerFunc(h.listNotes)))
 	mux.Handle("POST /api/notes", authMiddleware(http.HandlerFunc(h.createNote)))
+	mux.Handle("POST /api/notes/upload", authMiddleware(http.HandlerFunc(h.uploadNote)))
+
+	mux.Handle("GET /api/notes/shared", authMiddleware(http.HandlerFunc(h.listSharedNotes)))
+
 	mux.Handle("PUT /api/notes/{id}", authMiddleware(http.HandlerFunc(h.updateNote)))
 	mux.Handle("DELETE /api/notes/{id}", authMiddleware(http.HandlerFunc(h.deleteNote)))
-
 	mux.Handle("POST /api/notes/{id}/ai-review", authMiddleware(http.HandlerFunc(h.aiReview)))
 	mux.Handle("POST /api/notes/{id}/submit", authMiddleware(http.HandlerFunc(h.submitNote)))
-	mux.Handle("POST /api/notes/upload", authMiddleware(http.HandlerFunc(h.uploadNote)))
+
+	mux.Handle("POST /api/notes/{id}/share", authMiddleware(http.HandlerFunc(h.shareNote)))
 
 	mux.Handle("GET /api/teacher/notes/pending", authMiddleware(http.HandlerFunc(h.listPending)))
 	mux.Handle("POST /api/notes/{id}/approve", authMiddleware(http.HandlerFunc(h.approveNote)))
@@ -91,6 +101,7 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(note)
 }
 
+//nolint:dupl
 func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request) {
 	authorID, ok := getUserID(w, r)
 	if !ok {
@@ -267,4 +278,43 @@ func extractTextFromDocx(file multipart.File, size int64) (string, error) {
 	}
 
 	return strings.TrimSpace(textBuilder.String()), nil
+}
+
+// --- NUEVO: Endpoint para compartir un apunte con un email o grupo ---
+//
+//nolint:dupl
+func (h *Handler) shareNote(w http.ResponseWriter, r *http.Request) {
+	authorID, ok := getUserID(w, r)
+	if !ok {
+		return
+	}
+
+	noteID := r.PathValue("id")
+	var req ShareRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "JSON inválido", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.ShareNote(r.Context(), noteID, authorID, req.Email, req.GroupID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// --- NUEVO: Endpoint para listar los apuntes que me han compartido ---
+func (h *Handler) listSharedNotes(w http.ResponseWriter, r *http.Request) {
+	userID, ok := getUserID(w, r)
+	if !ok {
+		return
+	}
+
+	list, err := h.svc.GetSharedNotes(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(list)
 }

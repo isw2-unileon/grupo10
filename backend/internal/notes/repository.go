@@ -20,6 +20,11 @@ type Repository interface {
 	DeleteNote(ctx context.Context, id string, authorID string) error
 	GetPending(ctx context.Context) ([]Note, error)
 	ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error
+
+	// Nuevas funciones para compartir
+	GetUserEmail(ctx context.Context, userID string) (string, error)
+	ShareNote(ctx context.Context, noteID string, email, groupID *string) error
+	GetSharedWithMe(ctx context.Context, email string) ([]Note, error)
 }
 
 // PostgresRepository implementa la interfaz Repository usando PostgreSQL.
@@ -43,6 +48,8 @@ func (r *PostgresRepository) CreateNote(ctx context.Context, n *Note) error {
 }
 
 // GetByAuthor obtiene todos los apuntes de un usuario específico.
+//
+//nolint:dupl
 func (r *PostgresRepository) GetByAuthor(ctx context.Context, authorID string) ([]Note, error) {
 	query := `SELECT id, author_id, subject_id, title, content, status, ai_feedback, teacher_feedback, created_at, updated_at 
 	          FROM notes WHERE author_id = $1 ORDER BY updated_at DESC`
@@ -99,7 +106,6 @@ func (r *PostgresRepository) UpdateNoteWithAI(ctx context.Context, noteID, feedb
 	if err != nil {
 		return err
 	}
-	// Usamos una función anónima para gestionar el error exigido por errcheck
 	defer func() { _ = tx.Rollback() }()
 
 	if _, err = tx.ExecContext(ctx, `UPDATE notes SET status = $1, ai_feedback = $2, updated_at = NOW() WHERE id = $3`, StatusAiReviewed, feedback, noteID); err != nil {
@@ -125,7 +131,7 @@ func (r *PostgresRepository) DeleteNote(ctx context.Context, id string, authorID
 	return nil
 }
 
-// GetPending devuelve todos los apuntes que están pendientes de revisión.
+// GetPending devuelve todos los apuntes pendientes de revisión.
 func (r *PostgresRepository) GetPending(ctx context.Context) ([]Note, error) {
 	query := `SELECT id, author_id, subject_id, title, content, status, ai_feedback, teacher_feedback, created_at, updated_at 
 	          FROM notes WHERE status = 'pending' ORDER BY created_at ASC`
@@ -146,8 +152,51 @@ func (r *PostgresRepository) GetPending(ctx context.Context) ([]Note, error) {
 	return list, nil
 }
 
-// ApproveNoteWithFeedback guarda la corrección del docente(professor) y aprueba el apunte.
+// ApproveNoteWithFeedback guarda la corrección del docente (professor) y aprueba el apunte.
 func (r *PostgresRepository) ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE notes SET status = 'approved', teacher_feedback = $1, updated_at = NOW() WHERE id = $2`, feedback, noteID)
 	return err
+}
+
+// GetUserEmail obtiene el email de un usuario dado su ID.
+func (r *PostgresRepository) GetUserEmail(ctx context.Context, userID string) (string, error) {
+	var email string
+	err := r.db.QueryRowContext(ctx, `SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	return email, err
+}
+
+// ShareNote inserta un registro para compartir el apunte.
+func (r *PostgresRepository) ShareNote(ctx context.Context, noteID string, email, groupID *string) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO note_shares (note_id, shared_with_email, shared_with_group)
+		VALUES ($1, $2, $3)`, noteID, email, groupID)
+	return err
+}
+
+// GetSharedWithMe obtiene los apuntes que otros han compartido con este usuario mediante email o grupo.
+//
+//nolint:dupl
+func (r *PostgresRepository) GetSharedWithMe(ctx context.Context, email string) ([]Note, error) {
+	query := `
+		SELECT DISTINCT n.id, n.author_id, n.subject_id, n.title, n.content, n.status, n.ai_feedback, n.teacher_feedback, n.created_at, n.updated_at
+		FROM notes n
+		JOIN note_shares ns ON n.id = ns.note_id
+		LEFT JOIN group_members gm ON ns.shared_with_group = gm.group_id
+		WHERE ns.shared_with_email = $1 OR gm.email = $1
+		ORDER BY n.updated_at DESC`
+	rows, err := r.db.QueryContext(ctx, query, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Note
+	for rows.Next() {
+		var n Note
+		if err := rows.Scan(&n.ID, &n.AuthorID, &n.SubjectID, &n.Title, &n.Content, &n.Status, &n.AiFeedback, &n.TeacherFeedback, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, n)
+	}
+	return list, nil
 }
