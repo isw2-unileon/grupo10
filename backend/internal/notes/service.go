@@ -138,3 +138,30 @@ func (s *Service) GetPendingForTeacher(ctx context.Context) ([]Note, error) {
 func (s *Service) ApproveNoteWithFeedback(ctx context.Context, noteID, feedback string) error {
 	return s.repo.ApproveNoteWithFeedback(ctx, noteID, feedback)
 }
+
+// ShareNote valida la propiedad del apunte y tras ello, va a compartirlo.
+func (s *Service) ShareNote(ctx context.Context, noteID, authorID string, email, groupID *string) error {
+	// Verificamos que el apunte sea del usuario que lo intenta compartir
+	note, err := s.repo.GetByID(ctx, noteID)
+	if err != nil {
+		return err
+	}
+	if note.AuthorID != authorID {
+		return errors.New("no tienes permiso para compartir este apunte")
+	}
+
+	if email == nil && groupID == nil {
+		return errors.New("debes proporcionar un email o un ID de grupo para compartir")
+	}
+
+	return s.repo.ShareNote(ctx, noteID, email, groupID)
+}
+
+// GetSharedNotes recupera todos los apuntes que la comunidad ha compartido con este usuario.
+func (s *Service) GetSharedNotes(ctx context.Context, userID string) ([]Note, error) {
+	email, err := s.repo.GetUserEmail(ctx, userID)
+	if err != nil {
+		return nil, errors.New("no se pudo identificar el correo del usuario")
+	}
+	return s.repo.GetSharedWithMe(ctx, email)
+}

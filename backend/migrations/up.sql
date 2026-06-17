@@ -95,16 +95,20 @@ EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
 
+DROP TABLE IF EXISTS note_shares CASCADE;
+
 CREATE TABLE IF NOT EXISTS note_shares (
-    id        UUID       PRIMARY KEY DEFAULT gen_random_uuid(),
-    note_id   UUID       NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-    user_id   UUID       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role      share_role NOT NULL DEFAULT 'viewer',
-    shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(note_id, user_id)
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    note_id           UUID        NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+    shared_with_email VARCHAR(255),
+    shared_with_group UUID        REFERENCES class_groups(id) ON DELETE CASCADE,
+    role              share_role  NOT NULL DEFAULT 'viewer',
+    shared_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (shared_with_email IS NOT NULL OR shared_with_group IS NOT NULL)
 );
 
-CREATE INDEX IF NOT EXISTS idx_note_shares_note ON note_shares(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_shares_note  ON note_shares(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_shares_email ON note_shares(shared_with_email);
 
 -- AI feedback logs
 CREATE TABLE IF NOT EXISTS ai_feedback_logs (

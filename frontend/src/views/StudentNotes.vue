@@ -11,20 +11,29 @@ interface Note {
   created_at: string
 }
 
-const currentView = ref<'list' | 'editor' | 'upload' | 'detail'>('list')
+// Estados de la vista: añadimos 'shared' para la comunidad
+const currentView = ref<'list' | 'editor' | 'upload' | 'detail' | 'shared'>('list')
 const notes = ref<Note[]>([])
+const sharedNotes = ref<Note[]>([]) // Lista de apuntes de otros
 const selectedNote = ref<Note | null>(null)
+const viewingShared = ref(false) // Para saber si estamos leyendo un apunte propio o prestado
 const loading = ref(false)
 const actionLoading = ref(false)
 
-// Estados del editor manual
+// Estados del editor
 const editNoteId = ref<string | null>(null)
 const editTitle = ref('')
 const editContent = ref('')
 
-// Estados de subida de Word
+// Estados de subida
 const uploadTitle = ref('')
 const selectedFile = ref<File | null>(null)
+
+// --- ESTADOS DEL MODAL DE COMPARTIR ---
+const showShareModal = ref(false)
+const noteToShare = ref<string | null>(null)
+const shareEmail = ref('')
+const shareGroupId = ref('')
 
 const baseUrl = import.meta.env.VITE_API_URL || ''
 function getHeaders(isFormData = false) {
@@ -36,13 +45,14 @@ function getHeaders(isFormData = false) {
   return headers
 }
 
+// Cargar apuntes propios
 async function fetchNotes() {
   loading.value = true
   try {
     const res = await fetch(`${baseUrl}/api/notes`, { headers: getHeaders() })
     if (res.ok) {
       notes.value = await res.json()
-      if (selectedNote.value) {
+      if (selectedNote.value && !viewingShared.value) {
         const updated = notes.value.find(n => n.id === selectedNote.value?.id)
         if (updated) selectedNote.value = updated
       }
@@ -54,16 +64,39 @@ async function fetchNotes() {
   }
 }
 
+// Cargar apuntes que otros me han compartido
+async function fetchSharedNotes() {
+  loading.value = true
+  try {
+    const res = await fetch(`${baseUrl}/api/notes/shared`, { headers: getHeaders() })
+    if (res.ok) {
+      sharedNotes.value = await res.json()
+    }
+  } catch (e) {
+    console.error("Error cargando apuntes compartidos", e)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Cambiar de pestaña
+function switchView(view: 'list' | 'editor' | 'upload' | 'shared') {
+  currentView.value = view
+  if (view === 'list') fetchNotes()
+  if (view === 'shared') fetchSharedNotes()
+}
+
 onMounted(() => {
   fetchNotes()
 })
 
-function viewNoteDetail(note: Note) {
+// Entrar a estudiar un apunte
+function viewNoteDetail(note: Note, isShared: boolean = false) {
   selectedNote.value = note
+  viewingShared.value = isShared
   currentView.value = 'detail'
 }
 
-// Abrir editor para un apunte nuevo
 function openNewEditor() {
   editNoteId.value = null
   editTitle.value = ''
@@ -71,7 +104,6 @@ function openNewEditor() {
   currentView.value = 'editor'
 }
 
-// Abrir editor desde la vista de detalle
 function openEditFromDetail() {
   if (!selectedNote.value) return
   editNoteId.value = selectedNote.value.id
@@ -110,11 +142,6 @@ async function deleteNote(id: string, event?: Event) {
   } catch (e) { console.error(e) }
 }
 
-function handleFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (input.files && input.files.length > 0) selectedFile.value = input.files[0]
-}
-
 async function uploadDocument() {
   if (!uploadTitle.value || !selectedFile.value) return alert('Faltan datos.')
   const formData = new FormData()
@@ -132,6 +159,12 @@ async function uploadDocument() {
   } catch (e) { alert('Error al subir documento') }
 }
 
+function handleFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (input.files && input.files.length > 0) selectedFile.value = input.files[0]
+}
+
+// --- ACCIONES DE IA Y PROFESOR ---
 async function requestAIReview(noteId: string) {
   actionLoading.value = true
   try {
@@ -153,6 +186,46 @@ async function sendToTeacher(noteId: string) {
   finally { actionLoading.value = false }
 }
 
+// --- LÓGICA DE COMPARTIR ---
+function openShareDialog(noteId: string) {
+  noteToShare.value = noteId
+  shareEmail.value = ''
+  shareGroupId.value = ''
+  showShareModal.value = true
+}
+
+async function submitShare() {
+  if (!shareEmail.value && !shareGroupId.value) {
+    return alert('Debes introducir un email o un ID de grupo para compartir.')
+  }
+  
+  actionLoading.value = true
+  try {
+    const payload = {
+      email: shareEmail.value || undefined,
+      group_id: shareGroupId.value || undefined
+    }
+    
+    const res = await fetch(`${baseUrl}/api/notes/${noteToShare.value}/share`, { 
+      method: 'POST', 
+      headers: getHeaders(),
+      body: JSON.stringify(payload)
+    })
+    
+    if (res.ok) {
+      alert('✅ ¡Apunte compartido con éxito!')
+      showShareModal.value = false
+    } else {
+      const text = await res.text()
+      alert('Error al compartir: ' + text)
+    }
+  } catch (e) {
+    alert('Error de conexión al compartir.')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 function formatStatus(status: string) {
   switch (status) {
     case 'draft': return 'Borrador'
@@ -166,15 +239,42 @@ function formatStatus(status: string) {
 
 <template>
   <div class="notes-manager">
+    <div v-if="showShareModal" class="modal-overlay" @click.self="showShareModal = false">
+      <div class="modal-content">
+        <h3>🔗 Compartir Apunte</h3>
+        <p class="modal-desc">Escribe el email de un compañero o el ID de un grupo de clase para darle acceso de lectura a este documento.</p>
+        
+        <div class="form-group">
+          <label>Email del compañero:</label>
+          <input v-model="shareEmail" type="email" placeholder="ejemplo@estudiante.com" />
+        </div>
+        
+        <div class="divider-text"><span>O TAMBIÉN</span></div>
+        
+        <div class="form-group">
+          <label>ID del Grupo (Clase):</label>
+          <input v-model="shareGroupId" type="text" placeholder="Ej: 550e8400-e29b-41d4-a716-446655440000" />
+        </div>
+        
+        <div class="modal-actions">
+          <button @click="showShareModal = false" class="btn-cancel">Cancelar</button>
+          <button @click="submitShare" :disabled="actionLoading" class="btn-save">
+            {{ actionLoading ? 'Compartiendo...' : 'Compartir Ahora' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <header class="manager-header" v-if="currentView !== 'detail'">
       <div class="title-area">
         <h1>Mis Apuntes</h1>
-        <p class="subtitle">Gestiona, estudia y optimiza tus notas con Inteligencia Artificial</p>
+        <p class="subtitle">Gestiona, estudia y comparte tus notas con la comunidad</p>
       </div>
       <div class="header-actions">
-        <button @click="currentView = 'list'" :class="{'active': currentView === 'list'}" class="nav-btn">📋 Mi Biblioteca</button>
-        <button @click="openNewEditor" :class="{'active': currentView === 'editor'}" class="nav-btn">✍️ Redactar Nota</button>
-        <button @click="currentView = 'upload'" :class="{'active': currentView === 'upload'}" class="nav-btn">📄 Subir Word</button>
+        <button @click="switchView('list')" :class="{'active': currentView === 'list'}" class="nav-btn">📋 Biblioteca</button>
+        <button @click="switchView('shared')" :class="{'active': currentView === 'shared'}" class="nav-btn shared-tab">🤝 Comunidad</button>
+        <button @click="switchView('editor')" :class="{'active': currentView === 'editor'}" class="nav-btn">✍️ Redactar</button>
+        <button @click="switchView('upload')" :class="{'active': currentView === 'upload'}" class="nav-btn">📄 Word</button>
       </div>
     </header>
 
@@ -187,13 +287,12 @@ function formatStatus(status: string) {
       </div>
 
       <div class="notes-grid" v-if="notes.length > 0">
-        <article v-for="note in notes" :key="note.id" class="bubble-card" @click="viewNoteDetail(note)">
+        <article v-for="note in notes" :key="note.id" class="bubble-card" @click="viewNoteDetail(note, false)">
           <div class="card-top">
             <span class="badge" :class="note.status">{{ formatStatus(note.status) }}</span>
           </div>
           <h3 class="card-title">{{ note.title }}</h3>
           <p class="card-preview">{{ note.content.substring(0, 110) }}...</p>
-          
           <div class="card-footer">
             <button class="btn-card-open">👁️ Ver y Estudiar</button>
             <button @click="deleteNote(note.id, $event)" class="btn-card-delete" title="Borrar apunte">🗑️</button>
@@ -202,10 +301,33 @@ function formatStatus(status: string) {
       </div>
     </main>
 
+    <main v-if="currentView === 'shared'" class="view-list">
+      <p v-if="loading" class="info-msg">Buscando apuntes de la comunidad...</p>
+      <div v-if="!loading && sharedNotes.length === 0" class="empty-state">
+        <div class="empty-icon">🌱</div>
+        <h3>Nadie ha compartido nada contigo aún</h3>
+        <p>Pídele a tus compañeros que te compartan sus apuntes por email.</p>
+      </div>
+
+      <div class="notes-grid" v-if="sharedNotes.length > 0">
+        <article v-for="note in sharedNotes" :key="note.id" class="bubble-card shared-card" @click="viewNoteDetail(note, true)">
+          <div class="card-top">
+            <span class="badge shared-badge">🤝 Prestado</span>
+          </div>
+          <h3 class="card-title">{{ note.title }}</h3>
+          <p class="card-preview">{{ note.content.substring(0, 110) }}...</p>
+          <div class="card-footer">
+            <button class="btn-card-open">📖 Leer Apunte</button>
+          </div>
+        </article>
+      </div>
+    </main>
+
     <main v-else-if="currentView === 'detail' && selectedNote" class="view-detail">
       <div class="detail-navigation">
-        <button @click="currentView = 'list'" class="btn-back">⬅️</button>
-        <span class="badge status-indicator" :class="selectedNote.status">{{ formatStatus(selectedNote.status) }}</span>
+        <button @click="viewingShared ? switchView('shared') : switchView('list')" class="btn-back">⬅️ Volver atrás</button>
+        <span v-if="!viewingShared" class="badge status-indicator" :class="selectedNote.status">{{ formatStatus(selectedNote.status) }}</span>
+        <span v-else class="badge shared-badge status-indicator">🤝 Apunte de la Comunidad</span>
       </div>
       
       <div class="study-dashboard">
@@ -213,30 +335,17 @@ function formatStatus(status: string) {
           <div class="notebook-header-actions">
             <h2 class="notebook-title">{{ selectedNote.title }}</h2>
             
-            <div class="notebook-top-buttons">
-              <button 
-                v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'"
-                @click="openEditFromDetail" 
-                class="btn-note-edit"
-              >
-                ✏️ Modificar
+            <div class="notebook-top-buttons" v-if="!viewingShared">
+              <button @click="openShareDialog(selectedNote.id)" class="btn-note-share">🔗 Compartir</button>
+
+              <button v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'" @click="openEditFromDetail" class="btn-note-edit">✏️ Modificar</button>
+              
+              <button @click="requestAIReview(selectedNote.id)" :disabled="actionLoading" class="btn-note-ai">
+                {{ actionLoading ? '🤖 Pensando...' : '🤖 Consultar IA' }}
               </button>
               
-              <button 
-                @click="requestAIReview(selectedNote.id)" 
-                :disabled="actionLoading" 
-                class="btn-note-ai"
-              >
-                {{ actionLoading ? '🤖 Procesando...' : '🤖 Consultar IA' }}
-              </button>
-              
-              <button 
-                v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'"
-                @click="sendToTeacher(selectedNote.id)" 
-                :disabled="actionLoading" 
-                class="btn-note-teacher"
-              >
-                📤 Solicitar revisión
+              <button v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'" @click="sendToTeacher(selectedNote.id)" :disabled="actionLoading" class="btn-note-teacher">
+                📤 Entregar
               </button>
             </div>
           </div>
@@ -247,12 +356,11 @@ function formatStatus(status: string) {
 
         <aside class="study-sidebar" v-if="selectedNote.ai_feedback || selectedNote.teacher_feedback">
           <div v-if="selectedNote.ai_feedback" class="feedback-bubble ai">
-            <div class="bubble-title">🤖 Informe de la Inteligencia Artificial</div>
+            <div class="bubble-title">🤖 Informe IA</div>
             <p class="bubble-text">{{ selectedNote.ai_feedback }}</p>
           </div>
-          
           <div v-if="selectedNote.teacher_feedback" class="feedback-bubble teacher">
-            <div class="bubble-title">👨‍🏫 Corrección Oficial del Docente</div>
+            <div class="bubble-title">👨‍🏫 Corrección Oficial</div>
             <p class="bubble-text">{{ selectedNote.teacher_feedback }}</p>
           </div>
         </aside>
@@ -263,37 +371,36 @@ function formatStatus(status: string) {
       <div class="editor-box">
         <h2>{{ editNoteId ? '✍️ Modificar Apunte' : '✍️ Crear Nuevo Apunte' }}</h2>
         <div class="form-group">
-          <label>Título del Apunte</label>
-          <input v-model="editTitle" type="text" placeholder="Ej: Tema 4 - Arquitecturas de Red" />
+          <label>Título</label>
+          <input v-model="editTitle" type="text" placeholder="Ej: Tema 4..." />
         </div>
         <div class="form-group">
-          <label>Cuerpo del Documento</label>
-          <textarea v-model="editContent" rows="15" placeholder="Escribe o pega el contenido temático completo para poder estudiar más tarde..."></textarea>
+          <label>Cuerpo</label>
+          <textarea v-model="editContent" rows="15" placeholder="Escribe aquí..."></textarea>
         </div>
         <div class="form-actions">
           <button @click="editNoteId ? currentView = 'detail' : currentView = 'list'" class="btn-cancel">Cancelar</button>
-          <button @click="saveManualNote" class="btn-save">💾 Guardar en Biblioteca</button>
+          <button @click="saveManualNote" class="btn-save">💾 Guardar</button>
         </div>
       </div>
     </main>
 
     <main v-else-if="currentView === 'upload'" class="view-upload">
       <div class="upload-container">
-        <h2>📄 Importar desde archivo Microsoft Word</h2>
-        <p class="upload-help">Subiendo un archivo .docx, el sistema leerá los párrafos automáticamente y los transformará en apuntes interactivos estructurados.</p>
+        <h2>📄 Importar Word</h2>
         <div class="upload-card">
           <div class="form-group">
-            <label>Asigna un título</label>
-            <input v-model="uploadTitle" type="text" placeholder="Ej: Apuntes de Sistemas Operativos" />
+            <label>Título</label>
+            <input v-model="uploadTitle" type="text" placeholder="Ej: Apuntes SO" />
           </div>
           <div class="form-group file-wrapper">
             <label class="custom-file-upload">
               <input type="file" @change="handleFileChange" accept=".docx" />
-              📁 Seleccionar Archivo (.docx)
+              📁 Elegir (.docx)
             </label>
-            <span class="file-name-preview" v-if="selectedFile">Archivo: <strong>{{ selectedFile.name }}</strong></span>
+            <span class="file-name-preview" v-if="selectedFile">{{ selectedFile.name }}</span>
           </div>
-          <button @click="uploadDocument" :disabled="!selectedFile" class="btn-upload-submit">Subir y Descomprimir Texto ⬆️</button>
+          <button @click="uploadDocument" :disabled="!selectedFile" class="btn-upload-submit">Subir ⬆️</button>
         </div>
       </div>
     </main>
@@ -301,90 +408,86 @@ function formatStatus(status: string) {
 </template>
 
 <style scoped>
-.notes-manager { max-width: 1200px; margin: 0 auto; padding: 2.5rem 1rem; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; }
-
-/* CABECERA PRINCIPAL */
+/* ESTILOS BASE */
+.notes-manager { max-width: 1200px; margin: 0 auto; padding: 2.5rem 1rem; font-family: 'Segoe UI', sans-serif; color: #1e293b; }
 .manager-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
 .title-area h1 { margin: 0 0 0.25rem 0; font-size: 2.25rem; color: #0f172a; font-weight: 800; }
 .subtitle { margin: 0; color: #64748b; font-size: 1rem; }
-.header-actions { display: flex; gap: 0.5rem; background: #f1f5f9; padding: 0.4rem; border-radius: 0.75rem; }
+.header-actions { display: flex; gap: 0.5rem; background: #f1f5f9; padding: 0.4rem; border-radius: 0.75rem; flex-wrap: wrap; }
 .nav-btn { padding: 0.6rem 1.2rem; border: none; background: transparent; cursor: pointer; border-radius: 0.5rem; font-weight: 700; color: #64748b; transition: all 0.2s ease; }
 .nav-btn.active { background: white; color: #2563eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.nav-btn.shared-tab.active { color: #059669; }
 
-/* SISTEMA DE REJILLA / TARJETAS */
+/* MODAL DE COMPARTIR */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+.modal-content { background: white; padding: 2.5rem; border-radius: 1.25rem; width: 90%; max-width: 450px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+.modal-content h3 { margin: 0 0 0.5rem 0; font-size: 1.5rem; color: #0f172a; }
+.modal-desc { color: #64748b; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5; }
+.divider-text { text-align: center; margin: 1rem 0; position: relative; }
+.divider-text::before { content: ''; position: absolute; left: 0; top: 50%; width: 100%; height: 1px; background: #e2e8f0; z-index: 1; }
+.divider-text span { background: white; padding: 0 10px; color: #94a3b8; font-size: 0.8rem; font-weight: 700; position: relative; z-index: 2; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+
+/* TARJETAS */
 .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.75rem; }
-.bubble-card { background: white; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; display: flex; flex-direction: column; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.bubble-card { background: white; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; display: flex; flex-direction: column; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); cursor: pointer; transition: all 0.2s ease; }
 .bubble-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(37,99,235,0.1); border-color: #bfdbfe; }
+.shared-card:hover { box-shadow: 0 10px 15px -3px rgba(5,150,105,0.1); border-color: #a7f3d0; }
 .card-top { margin-bottom: 1rem; }
-.card-title { margin: 0 0 0.75rem 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; line-height: 1.4; }
-.card-preview { color: #475569; font-size: 0.95rem; line-height: 1.6; margin: 0 0 1.5rem 0; flex-grow: 1; }
-.card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; border-top: 1px solid #f1f5f9; padding-top: 1rem; }
-.btn-card-open { background: #eff6ff; color: #2563eb; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
-.btn-card-open:hover { background: #dbeafe; }
-.btn-card-delete { background: transparent; border: none; font-size: 1.1rem; cursor: pointer; padding: 0.4rem; border-radius: 0.375rem; }
-.btn-card-delete:hover { background: #fef2f2; color: #dc2626; }
+.card-title { margin: 0 0 0.75rem 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+.card-preview { color: #475569; font-size: 0.95rem; line-height: 1.6; flex-grow: 1; margin-bottom: 1.5rem; }
+.card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 1rem; }
+.btn-card-open { background: #eff6ff; color: #2563eb; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
+.btn-card-delete { background: transparent; border: none; font-size: 1.1rem; cursor: pointer; }
 
-/* BADGES ESTILIZADAS */
-.badge { padding: 0.35rem 0.8rem; font-size: 0.75rem; border-radius: 9999px; font-weight: 700; display: inline-block; text-transform: uppercase; letter-spacing: 0.05em; }
+/* ETIQUETAS */
+.badge { padding: 0.35rem 0.8rem; font-size: 0.75rem; border-radius: 9999px; font-weight: 700; display: inline-block; text-transform: uppercase; }
 .badge.draft { background: #f1f5f9; color: #475569; }
 .badge.ai_reviewed { background: #f3e8ff; color: #7e22ce; }
 .badge.pending { background: #fef3c7; color: #b45309; }
 .badge.approved { background: #dcfce3; color: #166534; }
-.status-indicator { margin-bottom: 0; }
+.shared-badge { background: #dcfce3; color: #059669; border: 1px solid #6ee7b7; }
 
-/* PANEL DE ESTUDIO (DETALLE) */
+/* ZONA DE ESTUDIO */
 .detail-navigation { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-.btn-back { background: white; border: 1px solid #cbd5e1; padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer; font-weight: 700; font-size: 0.9rem; }
-.btn-back:hover { background: #f8fafc; }
+.btn-back { background: white; border: 1px solid #cbd5e1; padding: 0.6rem 1.2rem; border-radius: 0.5rem; cursor: pointer; font-weight: 700; }
 .study-dashboard { display: grid; grid-template-columns: 2fr 1fr; gap: 2.5rem; align-items: start; }
 @media (max-width: 900px) { .study-dashboard { grid-template-columns: 1fr; } }
-
-/* El folio del cuaderno */
 .notebook-sheet { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 2.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.02); }
-.notebook-header-actions { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.notebook-header-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
 .notebook-title { margin: 0; font-size: 1.8rem; color: #0f172a; font-weight: 800; flex: 1; }
-.notebook-top-buttons { display: flex; gap: 0.5rem; }
+.notebook-top-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-.notebook-divider { border: 0; height: 2px; background: #f1f5f9; margin-bottom: 1.75rem; margin-top: 1rem; }
-.notebook-body { font-size: 1.15rem; line-height: 1.8; color: #2d3748; white-space: pre-wrap; margin-bottom: 1rem; text-align: justify; }
+.btn-note-share { padding: 0.5rem 1rem; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 0.375rem; font-weight: 700; cursor: pointer; }
+.btn-note-share:hover { background: #dbeafe; }
+.btn-note-edit { padding: 0.5rem 1rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-weight: 700; cursor: pointer; }
+.btn-note-ai { padding: 0.5rem 1rem; background: #7c3aed; color: white; border: none; border-radius: 0.375rem; font-weight: 700; cursor: pointer; }
+.btn-note-teacher { padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 0.375rem; font-weight: 700; cursor: pointer; }
 
-/* Botones reubicados arriba (Estilos limpios) */
-.btn-note-edit { padding: 0.5rem 1rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; color: #475569; }
-.btn-note-edit:hover { background: #f8fafc; }
-.btn-note-ai { padding: 0.5rem 1rem; background: #7c3aed; color: white; border: none; border-radius: 0.375rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
-.btn-note-ai:hover:not(:disabled) { background: #6d28d9; }
-.btn-note-teacher { padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 0.375rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
-.btn-note-teacher:hover:not(:disabled) { background: #059669; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.notebook-divider { border: 0; height: 2px; background: #f1f5f9; margin: 1.5rem 0; }
+.notebook-body { font-size: 1.15rem; line-height: 1.8; color: #2d3748; white-space: pre-wrap; text-align: justify; }
 
-/* Sidebar de feedback */
+/* FEEDBACK & FORMULARIOS */
 .study-sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
-.feedback-bubble { padding: 1.5rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); border-left: 5px solid; }
-.bubble-title { font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 0.75rem; }
-.bubble-text { margin: 0; font-size: 1rem; line-height: 1.6; }
+.feedback-bubble { padding: 1.5rem; border-radius: 1rem; border-left: 5px solid; }
+.bubble-title { font-weight: 700; text-transform: uppercase; margin-bottom: 0.75rem; }
 .feedback-bubble.ai { background: #faf5ff; border-color: #a855f7; color: #5b21b6; }
 .feedback-bubble.teacher { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
 
-/* FORMULARIOS */
-.editor-box, .upload-container { background: white; border: 1px solid #e2e8f0; padding: 2.5rem; border-radius: 1.25rem; max-width: 800px; margin: 0 auto; }
 .form-group { margin-bottom: 1.5rem; display: flex; flex-direction: column; }
-.form-group label { font-weight: 700; margin-bottom: 0.5rem; color: #334155; font-size: 0.95rem; }
-.form-group input, .form-group textarea { padding: 0.85rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-family: inherit; font-size: 1rem; }
-.form-group input:focus, .form-group textarea:focus { outline: none; border-color: #2563eb; }
-
+.form-group label { font-weight: 700; margin-bottom: 0.5rem; color: #334155; }
+.form-group input, .form-group textarea { padding: 0.85rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-family: inherit; }
 .form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-.btn-cancel { padding: 0.75rem 1.5rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.5rem; cursor: pointer; font-weight: 700; }
-.btn-save, .btn-upload-submit { background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
-.btn-save:hover, .btn-upload-submit:hover { background: #1d4ed8; }
+.btn-cancel { padding: 0.75rem 1.5rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
+.btn-save { background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
 
+.editor-box, .upload-container { background: white; border: 1px solid #e2e8f0; padding: 2.5rem; border-radius: 1.25rem; max-width: 800px; margin: 0 auto; }
 .upload-card { background: #f8fafc; border: 2px dashed #cbd5e1; padding: 2rem; border-radius: 1rem; margin-top: 1.5rem; }
-.upload-help { color: #64748b; font-size: 1rem; line-height: 1.5; margin: 0; }
-.custom-file-upload { display: inline-block; padding: 0.75rem 1.2rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-weight: 700; cursor: pointer; margin-bottom: 0.5rem; }
+.custom-file-upload { display: inline-block; padding: 0.75rem 1.2rem; background: white; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
 .custom-file-upload input[type="file"] { display: none; }
-.file-name-preview { display: block; font-size: 0.9rem; color: #059669; margin-top: 0.25rem; }
+.btn-upload-submit { background: #2563eb; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-weight: 700; cursor: pointer; }
 
 .empty-state { text-align: center; color: #64748b; padding: 4rem 2rem; background: white; border: 2px dashed #e2e8f0; border-radius: 1.25rem; max-width: 500px; margin: 2rem auto; }
 .empty-icon { font-size: 3.5rem; margin-bottom: 1rem; }
-.empty-state h3 { margin: 0 0 0.5rem 0; color: #0f172a; font-size: 1.35rem; }
-.empty-state p { margin: 0; font-size: 0.95rem; }
+.empty-state h3 { margin: 0 0 0.5rem 0; color: #0f172a; }
 </style>
