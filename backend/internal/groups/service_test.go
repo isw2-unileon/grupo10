@@ -5,23 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 )
 
 // fakeRepo is an in-memory Repository so the service can be tested without a DB.
 type fakeRepo struct {
-	accounts map[string]*Account // userID -> account
-	groups   map[string]*Group   // groupID -> group
-	members  map[string][]Member // groupID -> roster
-	tasks    map[string][]Task   // groupID -> tasks
-	seq      int
+	accounts  map[string]*Account  // userID -> account
+	groups    map[string]*Group    // groupID -> group
+	members   map[string][]Member  // groupID -> roster
+	sections  map[string]*Section  // sectionID -> section
+	resources map[string]*Resource // resourceID -> resource
+	seq       int
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		accounts: map[string]*Account{},
-		groups:   map[string]*Group{},
-		members:  map[string][]Member{},
-		tasks:    map[string][]Task{},
+		accounts:  map[string]*Account{},
+		groups:    map[string]*Group{},
+		members:   map[string][]Member{},
+		sections:  map[string]*Section{},
+		resources: map[string]*Resource{},
 	}
 }
 
@@ -108,15 +111,90 @@ func (f *fakeRepo) IsMember(_ context.Context, groupID, email string) (bool, err
 	return f.hasMember(groupID, email), nil
 }
 
-func (f *fakeRepo) CreateTask(_ context.Context, t *Task) error {
-	t.ID = f.id("task")
-	f.tasks[t.GroupID] = append(f.tasks[t.GroupID], *t)
+// ==========================================
+// NUEVOS MÉTODOS MOODLE PARA PASAR EL LINTER
+// ==========================================
+
+func (f *fakeRepo) CreateSection(_ context.Context, sec *Section) error {
+	sec.ID = f.id("section")
+	f.sections[sec.ID] = sec
 	return nil
 }
 
-func (f *fakeRepo) ListTasks(_ context.Context, groupID string) ([]Task, error) {
-	return f.tasks[groupID], nil
+func (f *fakeRepo) UpdateSection(_ context.Context, sectionID, title string) error { return nil }
+func (f *fakeRepo) DeleteSection(_ context.Context, sectionID string) error        { return nil }
+
+func (f *fakeRepo) GetSections(_ context.Context, groupID string) ([]Section, error) {
+	var out []Section
+	for _, s := range f.sections {
+		if s.GroupID == groupID {
+			out = append(out, *s)
+		}
+	}
+	return out, nil
 }
+
+func (f *fakeRepo) GetSectionGroup(_ context.Context, sectionID string) (string, error) {
+	s, ok := f.sections[sectionID]
+	if !ok {
+		return "", errors.New("section not found")
+	}
+	return s.GroupID, nil
+}
+
+func (f *fakeRepo) CreateResource(_ context.Context, res *Resource) error {
+	res.ID = f.id("resource")
+	f.resources[res.ID] = res
+	return nil
+}
+
+func (f *fakeRepo) UpdateResource(_ context.Context, res *Resource) error     { return nil }
+func (f *fakeRepo) DeleteResource(_ context.Context, resourceID string) error { return nil }
+func (f *fakeRepo) GetResourceByID(_ context.Context, resourceID string) (*Resource, error) {
+	r, ok := f.resources[resourceID]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return r, nil
+}
+
+func (f *fakeRepo) ListResourcesForSection(_ context.Context, sectionID string) ([]Resource, error) {
+	var out []Resource
+	for _, r := range f.resources {
+		if r.SectionID == sectionID {
+			out = append(out, *r)
+		}
+	}
+	return out, nil
+}
+
+// Stubs vacíos requeridos por la interfaz
+func (f *fakeRepo) CreateQuizQuestion(ctx context.Context, q *QuizQuestion) error { return nil }
+func (f *fakeRepo) CreateQuizOption(ctx context.Context, opt *QuizOption) error   { return nil }
+func (f *fakeRepo) GetQuizQuestions(ctx context.Context, resourceID string) ([]QuizQuestion, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetQuizOptions(ctx context.Context, questionID string) ([]QuizOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) SubmitAssignment(ctx context.Context, sub *Submission) error { return nil }
+func (f *fakeRepo) GradeSubmission(ctx context.Context, resourceID, studentID string, grade float64, feedback string) error {
+	return nil
+}
+func (f *fakeRepo) GetSubmissions(ctx context.Context, resourceID string) ([]Submission, error) {
+	return nil, nil
+}
+func (f *fakeRepo) HasSubmitted(ctx context.Context, resourceID, studentID string) (bool, time.Time, *float64, error) {
+	return false, time.Time{}, nil, nil
+}
+func (f *fakeRepo) SaveQuizAnswer(ctx context.Context, resourceID, studentID, questionID, optionID string) error {
+	return nil
+}
+func (f *fakeRepo) GetStudentAnswers(ctx context.Context, resourceID, studentID string) (map[string]string, error) {
+	return nil, nil
+}
+
+// ==========================================
 
 func (f *fakeRepo) hasMember(groupID, email string) bool {
 	for _, m := range f.members[groupID] {
@@ -221,7 +299,8 @@ func TestAddMembers_NonOwnerForbidden(t *testing.T) {
 	}
 }
 
-func TestListTasks_AccessControl(t *testing.T) {
+// ADAPTADO: Ahora comprueba el acceso a GetGroupContent en lugar de ListTasks
+func TestGetGroupContent_AccessControl(t *testing.T) {
 	repo := newFakeRepo()
 	svc := newServiceWith(repo)
 	owner := repo.seedAccount(roleTeacher, "prof@unileon.es")
@@ -232,17 +311,19 @@ func TestListTasks_AccessControl(t *testing.T) {
 	if _, err := svc.AddMembers(context.Background(), owner, g.ID, []string{"alu@unileon.es"}); err != nil {
 		t.Fatalf("seed roster: %v", err)
 	}
-	if _, err := svc.CreateTask(context.Background(), owner, g.ID, TaskInput{Title: "Homework 1"}); err != nil {
-		t.Fatalf("create task: %v", err)
+
+	// El docente (professor) crea una sección (sustituye a la antigua tarea)
+	if _, err := svc.CreateSection(context.Background(), owner, g.ID, "Tema 1", 0); err != nil {
+		t.Fatalf("create section: %v", err)
 	}
 
-	if _, err := svc.ListTasks(context.Background(), owner, g.ID); err != nil {
-		t.Fatalf("owner should see tasks: %v", err)
+	if _, err := svc.GetGroupContent(context.Background(), owner, g.ID); err != nil {
+		t.Fatalf("owner should see content: %v", err)
 	}
-	if _, err := svc.ListTasks(context.Background(), student, g.ID); err != nil {
-		t.Fatalf("roster student should see tasks: %v", err)
+	if _, err := svc.GetGroupContent(context.Background(), student, g.ID); err != nil {
+		t.Fatalf("roster student should see content: %v", err)
 	}
-	if _, err := svc.ListTasks(context.Background(), outsider, g.ID); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.GetGroupContent(context.Background(), outsider, g.ID); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("outsider must be forbidden, got %v", err)
 	}
 }

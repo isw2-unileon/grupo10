@@ -197,16 +197,81 @@ CREATE TABLE IF NOT EXISTS group_members (
 
 CREATE INDEX IF NOT EXISTS idx_group_members_email ON group_members(email);
 
--- Tasks posted to a group (view-only for students in v1).
-CREATE TABLE IF NOT EXISTS group_tasks (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    group_id    UUID         NOT NULL REFERENCES class_groups(id) ON DELETE CASCADE,
-    title       VARCHAR(300) NOT NULL,
-    description TEXT,
-    due_at      TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+-- Eliminar tablas previas para recrearlas con soporte de archivos y cuestionarios
+DROP TABLE IF EXISTS student_submissions CASCADE;
+DROP TABLE IF EXISTS quiz_answers CASCADE;
+DROP TABLE IF EXISTS quiz_options CASCADE;
+DROP TABLE IF EXISTS quiz_questions CASCADE;
+DROP TABLE IF EXISTS group_resources CASCADE;
+DROP TABLE IF EXISTS group_sections CASCADE;
+
+-- 1. Secciones de la asignatura
+CREATE TABLE IF NOT EXISTS group_sections (
+    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id  UUID NOT NULL REFERENCES class_groups(id) ON DELETE CASCADE,
+    title     VARCHAR(200) NOT NULL,
+    position  INT NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_group_tasks_group ON group_tasks(group_id);
+-- 2. Recursos, Tareas y Cuestionarios
+CREATE TABLE IF NOT EXISTS group_resources (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    section_id  UUID NOT NULL REFERENCES group_sections(id) ON DELETE CASCADE,
+    type        resource_type NOT NULL, -- 'file', 'assignment', 'quiz'
+    title       VARCHAR(300) NOT NULL,
+    content     TEXT, -- Descripción de la tarea o instrucciones
+    file_path   VARCHAR(500), -- Ruta del archivo subido por el profesor (.docx, .pptx, etc)
+    due_at      TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+-- 3. Cuestionarios: Preguntas
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_id UUID NOT NULL REFERENCES group_resources(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    position    INT NOT NULL DEFAULT 0
+);
+
+-- 4. Cuestionarios: Opciones de respuesta
+CREATE TABLE IF NOT EXISTS quiz_options (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    question_id UUID NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+    option_text TEXT NOT NULL,
+    is_correct  BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- 5. Entregas de tareas de los alumnos (Soporta archivos físicos)
+CREATE TABLE IF NOT EXISTS student_submissions (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_id  UUID NOT NULL REFERENCES group_resources(id) ON DELETE CASCADE,
+    student_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    text_content TEXT, -- Texto opcional que deje el alumno
+    file_path    VARCHAR(500), -- Ruta del archivo entregado por el alumno (.pdf, .zip)
+    grade        NUMERIC(4,2), -- Nota asignada por el profesor (Ej: 8.50)
+    feedback     TEXT, -- Comentarios del profesor
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(resource_id, student_id)
+);
+
+-- 6. Respuestas de los alumnos a los cuestionarios
+CREATE TABLE IF NOT EXISTS quiz_submissions (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_id UUID NOT NULL REFERENCES group_resources(id) ON DELETE CASCADE,
+    student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    score       NUMERIC(4,2) NOT NULL, -- Nota calculada automáticamente
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(resource_id, student_id)
+);
+
+-- 7. Respuestas individuales de los alumnos a cada pregunta del cuestionario
+CREATE TABLE IF NOT EXISTS student_quiz_answers (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resource_id   UUID NOT NULL REFERENCES group_resources(id) ON DELETE CASCADE,
+    student_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question_id   UUID NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+    option_id     UUID NOT NULL REFERENCES quiz_options(id) ON DELETE CASCADE,
+    UNIQUE(student_id, question_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_quiz_answers_lookup ON student_quiz_answers(resource_id, student_id);
