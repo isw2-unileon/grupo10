@@ -212,6 +212,12 @@ CREATE TABLE IF NOT EXISTS group_sections (
     title     VARCHAR(200) NOT NULL,
     position  INT NOT NULL DEFAULT 0
 );
+-- 1.5 Crear el tipo ENUM para los recursos (AÑADIR ESTE BLOQUE)
+DO $$ BEGIN
+    CREATE TYPE resource_type AS ENUM ('file', 'assignment', 'quiz');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 2. Recursos, Tareas y Cuestionarios
 CREATE TABLE IF NOT EXISTS group_resources (
