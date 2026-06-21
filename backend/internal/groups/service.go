@@ -55,7 +55,7 @@ func (s *Service) CreateGroup(ctx context.Context, userID, name string) (*Group,
 	}
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > maxNameLength {
-		return nil, errors.New("nombre inválido")
+		return nil, ErrValidation
 	}
 	g := &Group{Name: name, OwnerID: acc.ID}
 	return g, s.repo.CreateGroup(ctx, g)
@@ -441,7 +441,7 @@ func sanitizeEmails(emails []string) ([]string, error) {
 			continue
 		}
 		if _, err := mail.ParseAddress(e); err != nil {
-			return nil, err
+			return nil, ErrValidation
 		}
 		if _, dup := seen[e]; dup {
 			continue
