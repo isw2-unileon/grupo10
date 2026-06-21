@@ -79,6 +79,12 @@ const router = createRouter({
       path: '/student/groups/:id/tasks',
       name: 'StudentGroupTasks',
       component: () => import('../views/StudentGroupTaskView.vue')
+    },
+    {
+      path: '/student/groups/:groupId/quiz/:resourceId',
+      name: 'student-quiz',
+      component: () => import('@/views/StudentQuizView.vue'),
+      meta: { requiresAuth: true }
     }
   ],
 })

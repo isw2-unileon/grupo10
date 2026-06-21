@@ -4,68 +4,68 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 )
 
-// Handler exposes the group endpoints over HTTP. It reuses the users module's
-// JWT middleware so every route requires an authenticated user.
+// Handler expone las rutas HTTP para la gestión de grupos.
 type Handler struct {
 	svc    *Service
 	parser users.TokenParser
 }
 
-// NewHandler builds an HTTP handler for the group service.
+// NewHandler inicializa un nuevo Handler.
 func NewHandler(svc *Service, parser users.TokenParser) *Handler {
 	return &Handler{svc: svc, parser: parser}
 }
 
-// RegisterRoutes wires the group endpoints onto the given mux. Every route is
-// wrapped in RequireAuth.
+// RegisterRoutes registra todas las rutas REST.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	auth := users.RequireAuth(h.parser)
+
 	mux.Handle("POST /api/groups", auth(http.HandlerFunc(h.createGroup)))
 	mux.Handle("GET /api/groups", auth(http.HandlerFunc(h.listOwnedGroups)))
 	mux.Handle("GET /api/me/groups", auth(http.HandlerFunc(h.listMyGroups)))
 	mux.Handle("GET /api/groups/{id}", auth(http.HandlerFunc(h.groupDetail)))
+
 	mux.Handle("POST /api/groups/{id}/members", auth(http.HandlerFunc(h.addMembers)))
 	mux.Handle("DELETE /api/groups/{id}/members/{memberID}", auth(http.HandlerFunc(h.removeMember)))
-	mux.Handle("POST /api/groups/{id}/tasks", auth(http.HandlerFunc(h.createTask)))
-	mux.Handle("GET /api/groups/{id}/tasks", auth(http.HandlerFunc(h.listTasks)))
-}
 
-type createGroupRequest struct {
-	Name string `json:"name"`
-}
+	mux.Handle("POST /api/groups/{id}/sections", auth(http.HandlerFunc(h.createSection)))
+	mux.Handle("PUT /api/sections/{sectionId}", auth(http.HandlerFunc(h.updateSection)))
+	mux.Handle("DELETE /api/sections/{sectionId}", auth(http.HandlerFunc(h.deleteSection)))
 
-type addMembersRequest struct {
-	Emails []string `json:"emails"`
-}
+	mux.Handle("POST /api/sections/{sectionId}/resources", auth(http.HandlerFunc(h.createResource)))
+	mux.Handle("POST /api/sections/{sectionId}/quizzes", auth(http.HandlerFunc(h.createQuiz)))
+	mux.Handle("DELETE /api/resources/{resourceId}", auth(http.HandlerFunc(h.deleteResource)))
+	mux.Handle("GET /api/groups/{id}/content", auth(http.HandlerFunc(h.getGroupContent)))
 
-type createTaskRequest struct {
-	Title       string     `json:"title"`
-	Description *string    `json:"description"`
-	DueAt       *time.Time `json:"due_at"`
-}
+	mux.Handle("POST /api/resources/{resourceId}/submit", auth(http.HandlerFunc(h.submitAssignment)))
+	mux.Handle("GET /api/resources/{resourceId}/submissions", auth(http.HandlerFunc(h.listSubmissions)))
+	mux.Handle("POST /api/resources/{resourceId}/submissions/{studentId}/grade", auth(http.HandlerFunc(h.gradeSubmission)))
 
-type groupDetailResponse struct {
-	*Group
-	Members []Member `json:"members"`
-	Tasks   []Task   `json:"tasks"`
+	mux.Handle("GET /api/uploads/{filename}", auth(http.HandlerFunc(h.serveFile)))
+	mux.Handle("PUT /api/resources/{resourceId}", auth(http.HandlerFunc(h.updateResource)))
+	mux.Handle("GET /api/resources/{resourceId}/quiz", auth(http.HandlerFunc(h.getQuiz)))
+	mux.Handle("POST /api/resources/{resourceId}/submit-quiz", auth(http.HandlerFunc(h.submitQuiz)))
+	mux.Handle("GET /api/resources/{resourceId}/review/{studentId}", auth(http.HandlerFunc(h.getQuizReview)))
 }
 
 func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	var req createGroupRequest
+	var req struct {
+		Name string `json:"name"`
+	}
 	if !decode(w, r, &req) {
 		return
 	}
-
-	g, err := h.svc.CreateGroup(r.Context(), userID, req.Name)
+	g, err := h.svc.CreateGroup(r.Context(), uID, req.Name)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -74,72 +74,69 @@ func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listOwnedGroups(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	gs, err := h.svc.GroupsOwned(r.Context(), userID)
+	gs, err := h.svc.GroupsOwned(r.Context(), uID)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, orEmptyGroups(gs))
+	writeJSON(w, http.StatusOK, gs)
 }
 
 func (h *Handler) listMyGroups(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	gs, err := h.svc.MyGroups(r.Context(), userID)
+	gs, err := h.svc.MyGroups(r.Context(), uID)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	// An empty array tells the frontend to show the "waiting for a group" state.
-	writeJSON(w, http.StatusOK, orEmptyGroups(gs))
+	writeJSON(w, http.StatusOK, gs)
 }
 
 func (h *Handler) groupDetail(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	g, members, tasks, err := h.svc.GroupDetail(r.Context(), userID, r.PathValue("id"))
+	g, mems, err := h.svc.GroupDetail(r.Context(), uID, r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, groupDetailResponse{
-		Group:   g,
-		Members: orEmptyMembers(members),
-		Tasks:   orEmptyTasks(tasks),
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"id": g.ID, "name": g.Name, "members": mems})
 }
 
 func (h *Handler) addMembers(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	var req addMembersRequest
+	var req struct {
+		Emails []string `json:"emails"`
+	}
 	if !decode(w, r, &req) {
 		return
 	}
-	members, err := h.svc.AddMembers(r.Context(), userID, r.PathValue("id"), req.Emails)
+	mems, err := h.svc.AddMembers(r.Context(), uID, r.PathValue("id"), req.Emails)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, orEmptyMembers(members))
+	writeJSON(w, http.StatusOK, mems)
 }
 
 func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	err := h.svc.RemoveMember(r.Context(), userID, r.PathValue("id"), r.PathValue("memberID"))
+	err := h.svc.RemoveMember(r.Context(), uID, r.PathValue("id"), r.PathValue("memberID"))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -147,38 +144,285 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) createTask(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+func (h *Handler) createSection(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	var req createTaskRequest
+	var req struct {
+		Title    string `json:"title"`
+		Position int    `json:"position"`
+	}
 	if !decode(w, r, &req) {
 		return
 	}
-	t, err := h.svc.CreateTask(r.Context(), userID, r.PathValue("id"), TaskInput(req))
+	sec, err := h.svc.CreateSection(r.Context(), uID, r.PathValue("id"), req.Title, req.Position)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, t)
+	writeJSON(w, http.StatusCreated, sec)
 }
 
-func (h *Handler) listTasks(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authUser(w, r)
+func (h *Handler) updateSection(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
 	if !ok {
 		return
 	}
-	tasks, err := h.svc.ListTasks(r.Context(), userID, r.PathValue("id"))
+	var req struct {
+		Title string `json:"title"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	err := h.svc.UpdateSection(r.Context(), uID, r.PathValue("sectionId"), req.Title)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, orEmptyTasks(tasks))
+	w.WriteHeader(http.StatusOK)
 }
 
-// authUser reads the user ID injected by RequireAuth. It should always be
-// present, but guarding keeps the handlers safe if the wiring changes.
+func (h *Handler) deleteSection(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	err := h.svc.DeleteSection(r.Context(), uID, r.PathValue("sectionId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) createResource(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	//nolint:gosec // Limitado de forma segura por MaxBytesReader en la línea superior
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "fichero demasiado grande"})
+		return
+	}
+
+	rType := r.FormValue("type")
+	title := r.FormValue("title")
+	content := r.FormValue("content")
+	dueStr := r.FormValue("due_at")
+
+	var dueAt *time.Time
+	if dueStr != "" {
+		if t, err := time.Parse(time.RFC3339, dueStr); err == nil {
+			dueAt = &t
+		}
+	}
+
+	filePath := ""
+	file, header, err := r.FormFile("file")
+	if err == nil {
+		defer file.Close()
+		path, saveErr := h.svc.SaveUploadedFile(file, header.Filename)
+		if saveErr == nil {
+			filePath = path
+		}
+	}
+
+	res, err := h.svc.CreateResource(r.Context(), uID, r.PathValue("sectionId"), rType, title, content, filePath, dueAt)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, res)
+}
+
+func (h *Handler) createQuiz(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Title     string         `json:"title"`
+		Questions []QuizQuestion `json:"questions"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	res, err := h.svc.CreateQuizWithQuestions(r.Context(), uID, r.PathValue("sectionId"), req.Title, req.Questions)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, res)
+}
+
+func (h *Handler) deleteResource(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	err := h.svc.DeleteResource(r.Context(), uID, r.PathValue("resourceId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) getGroupContent(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	content, err := h.svc.GetGroupContent(r.Context(), uID, r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, content)
+}
+
+func (h *Handler) submitAssignment(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	//nolint:gosec // Limitado de forma segura por MaxBytesReader en la línea superior
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "fichero excesivo"})
+		return
+	}
+
+	text := r.FormValue("text_content")
+	filePath := ""
+	file, header, err := r.FormFile("file")
+	if err == nil {
+		defer file.Close()
+		path, _ := h.svc.SaveUploadedFile(file, header.Filename)
+		filePath = path
+	}
+
+	err = h.svc.SubmitAssignment(r.Context(), uID, r.PathValue("resourceId"), text, filePath)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) listSubmissions(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	subs, err := h.svc.GetAssignmentSubmissions(r.Context(), uID, r.PathValue("resourceId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, subs)
+}
+
+func (h *Handler) gradeSubmission(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Grade    string `json:"grade"`
+		Feedback string `json:"feedback"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	parsedGrade, _ := strconv.ParseFloat(req.Grade, 64)
+	err := h.svc.GradeStudentTask(r.Context(), uID, r.PathValue("resourceId"), r.PathValue("studentId"), parsedGrade, req.Feedback)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) serveFile(w http.ResponseWriter, r *http.Request) {
+	if _, ok := authUser(w, r); !ok {
+		return
+	}
+	safeName := filepath.Clean(filepath.Base(r.PathValue("filename")))
+	http.ServeFile(w, r, filepath.Join(".", "uploads", safeName))
+}
+
+func (h *Handler) updateResource(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Title, Content string
+		DueAt          *time.Time `json:"due_at"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	err := h.svc.UpdateResource(r.Context(), uID, r.PathValue("resourceId"), req.Title, req.Content, req.DueAt)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) getQuiz(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	quiz, err := h.svc.GetQuiz(r.Context(), uID, r.PathValue("resourceId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, quiz)
+}
+
+func (h *Handler) submitQuiz(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Answers map[string]string `json:"answers"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+
+	grade, err := h.svc.SubmitQuiz(r.Context(), uID, r.PathValue("resourceId"), req.Answers)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"grade": grade})
+}
+
+func (h *Handler) getQuizReview(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	review, err := h.svc.GetQuizReview(r.Context(), uID, r.PathValue("resourceId"), r.PathValue("studentId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, review)
+}
+
 func authUser(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id, ok := users.UserIDFromContext(r.Context())
 	if !ok {
@@ -190,7 +434,7 @@ func authUser(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request data"})
 		return false
 	}
 	return true
@@ -202,7 +446,6 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// writeError maps domain errors to HTTP status codes, hiding internal details.
 func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrValidation):
@@ -212,28 +455,6 @@ func writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrMemberNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
-}
-
-// JSON marshals a nil slice as null; return [] instead so clients can iterate.
-func orEmptyGroups(gs []Group) []Group {
-	if gs == nil {
-		return []Group{}
-	}
-	return gs
-}
-
-func orEmptyMembers(ms []Member) []Member {
-	if ms == nil {
-		return []Member{}
-	}
-	return ms
-}
-
-func orEmptyTasks(ts []Task) []Task {
-	if ts == nil {
-		return []Task{}
-	}
-	return ts
 }
