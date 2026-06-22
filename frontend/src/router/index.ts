@@ -95,21 +95,21 @@ const router = createRouter({
 //    (typical after a page reload), rehydrate the account from /api/me once.
 // 2. Block protected routes for guests and bounce guest-only routes (login,
 //    register) for users who are already signed in.
-// router.beforeEach(async (to) => {
-//   const auth = useAuthStore()
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
 
-//   if (auth.token && !auth.user) {
-//     await auth.fetchMe()
-//   }
+  if (auth.token && !auth.user) {
+    await auth.fetchMe()
+  }
 
-//   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-//     return { name: 'login', query: { redirect: to.fullPath } }
-//   }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
 
-//   if (to.meta.guestOnly && auth.isAuthenticated) {
-//     return { name: 'home' }
-//   }
-// })
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    return { name: 'home' }
+  }
+})
 
 export default router
 // Prueba de despliegue Render
