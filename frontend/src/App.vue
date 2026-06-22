@@ -24,21 +24,21 @@ function onLogout() {
         Inicio
       </RouterLink>
       
-      <template v-if="auth.isAuthenticated">
+      <template v-if="auth.user">
         <button type="button" class="logout" @click="onLogout">
           Cerrar sesión
         </button>
       </template>
-      
+
       <template v-else>
         <RouterLink to="/login">Iniciar sesión</RouterLink>
         <RouterLink to="/register">Registrarse</RouterLink>
       </template>
     </nav>
-    
-    <div class="user-status" v-if="auth.isAuthenticated">
-      Sesión iniciada como: <strong>{{ auth.user?.email }}</strong> 
-      (Rol: <em>{{ auth.user?.role }}</em>)
+
+    <div class="user-status" v-if="auth.user">
+      Sesión iniciada como: <strong>{{ auth.user.email }}</strong>
+      (Rol: <em>{{ auth.user.role }}</em>)
     </div>
   </header>
 
