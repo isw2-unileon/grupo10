@@ -193,6 +193,9 @@ func (f *fakeRepo) SaveQuizAnswer(ctx context.Context, resourceID, studentID, qu
 func (f *fakeRepo) GetStudentAnswers(ctx context.Context, resourceID, studentID string) (map[string]string, error) {
 	return nil, nil
 }
+func (f *fakeRepo) GetStudentAnalytics(ctx context.Context, studentID string) ([]SubjectStat, error) {
+	return nil, nil
+}
 
 // ==========================================
 

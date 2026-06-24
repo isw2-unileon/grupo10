@@ -406,6 +406,59 @@ func (s *Service) GetQuizReview(ctx context.Context, userID, resourceID, student
 	return res, nil
 }
 
+// GetStudentProfile obtiene los datos del alumno y sus analíticas globales de forma segura.
+func (s *Service) GetStudentProfile(ctx context.Context, userID string) (*StudentProfile, error) {
+	acc, err := s.repo.AccountByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := s.repo.GetStudentAnalytics(ctx, userID)
+	if err != nil {
+		fmt.Printf("[ERROR] Error al realizar el cálculo de las analíticas: %v\n", err)
+		stats = []SubjectStat{}
+	}
+
+	return &StudentProfile{ID: acc.ID, Name: "Estudiante", Email: acc.Email, Role: acc.Role, Analytics: stats}, nil
+}
+
+// GetStudentStatsForTeacher extrae las estadísticas de un alumno filtradas por la asignatura del docente (professor).
+func (s *Service) GetStudentStatsForTeacher(ctx context.Context, teacherID, groupID, studentID string) (*SubjectStat, error) {
+	g, err := s.ownedGroup(ctx, teacherID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := s.repo.GetStudentAnalytics(ctx, studentID)
+	if err == nil {
+		for _, st := range stats {
+			if st.GroupID == groupID {
+				return &st, nil
+			}
+		}
+	}
+
+	// Fallback inteligente: Si el alumno no ha hecho tests o aún no se ha registrado,
+	// le mostramos al docente (professor) los temas reales de la asignatura con nota 0,
+	// para que NO diga "No hay temas estructurados".
+	sections, _ := s.repo.GetSections(ctx, groupID)
+	var secStats []SectionStat
+	for _, sec := range sections {
+		secStats = append(secStats, SectionStat{
+			SectionID:    sec.ID,
+			SectionTitle: sec.Title,
+			Average:      0,
+			GradedCount:  0,
+		})
+	}
+
+	if secStats == nil {
+		secStats = []SectionStat{}
+	}
+
+	return &SubjectStat{GroupID: groupID, GroupName: g.Name, TotalAverage: 0, Sections: secStats}, nil
+}
+
 func (s *Service) requireTeacher(ctx context.Context, userID string) (*Account, error) {
 	acc, err := s.repo.AccountByID(ctx, userID)
 	if err != nil {

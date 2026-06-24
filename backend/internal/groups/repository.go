@@ -354,3 +354,68 @@ func isInvalidUUID(err error) bool {
 	}
 	return false
 }
+
+// GetStudentAnalytics calcula las medias matemáticas del alumno cruzando entregas y cuestionarios con nota.
+func (r *PostgresRepository) GetStudentAnalytics(ctx context.Context, studentID string) ([]SubjectStat, error) {
+	const q = `
+		SELECT 
+			g.id::text AS group_id, g.name AS group_name,
+			COALESCE(s.id::text, '') AS section_id, COALESCE(s.title, '') AS section_title,
+			COALESCE(AVG(sub.grade), 0) AS avg_grade,
+			COUNT(sub.grade) AS graded_count
+		FROM class_groups g
+		JOIN group_members gm ON gm.group_id = g.id
+		JOIN users u ON LOWER(u.email) = LOWER(gm.email) AND (u.id::text = $1 OR gm.id::text = $1)
+		LEFT JOIN group_sections s ON s.group_id = g.id
+		LEFT JOIN group_resources res ON res.section_id = s.id AND res.type IN ('quiz', 'assignment')
+		LEFT JOIN student_submissions sub ON sub.resource_id = res.id AND sub.student_id = u.id AND sub.grade IS NOT NULL
+		GROUP BY g.id, g.name, s.id, s.title, s.position
+		ORDER BY g.name, s.position ASC`
+
+	rows, err := r.db.QueryContext(ctx, q, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groupsMap := make(map[string]*SubjectStat)
+	var orderedGroupIDs []string
+
+	for rows.Next() {
+		var gID, gName, sID, sTitle string
+		var avg float64
+		var count int
+		if err := rows.Scan(&gID, &gName, &sID, &sTitle, &avg, &count); err != nil {
+			return nil, err
+		}
+
+		if _, exists := groupsMap[gID]; !exists {
+			groupsMap[gID] = &SubjectStat{GroupID: gID, GroupName: gName, Sections: []SectionStat{}}
+			orderedGroupIDs = append(orderedGroupIDs, gID)
+		}
+
+		if sID != "" {
+			groupsMap[gID].Sections = append(groupsMap[gID].Sections, SectionStat{
+				SectionID: sID, SectionTitle: sTitle, Average: avg, GradedCount: count,
+			})
+		}
+	}
+
+	var out []SubjectStat
+	for _, id := range orderedGroupIDs {
+		subStat := groupsMap[id]
+		var sum float64
+		var validSections int
+		for _, sec := range subStat.Sections {
+			if sec.GradedCount > 0 {
+				sum += sec.Average
+				validSections++
+			}
+		}
+		if validSections > 0 {
+			subStat.TotalAverage = sum / float64(validSections)
+		}
+		out = append(out, *subStat)
+	}
+	return out, nil
+}

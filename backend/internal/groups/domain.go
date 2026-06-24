@@ -89,6 +89,31 @@ type Account struct {
 	Email string
 }
 
+// SectionStat detalla la nota media de un alumno en un tema específico.
+type SectionStat struct {
+	SectionID    string  `json:"section_id"`
+	SectionTitle string  `json:"section_title"`
+	Average      float64 `json:"average"`
+	GradedCount  int     `json:"graded_count"`
+}
+
+// SubjectStat resume el rendimiento general en una asignatura completa.
+type SubjectStat struct {
+	GroupID      string        `json:"group_id"`
+	GroupName    string        `json:"group_name"`
+	TotalAverage float64       `json:"total_average"`
+	Sections     []SectionStat `json:"sections"`
+}
+
+// StudentProfile agrupa los datos personales y académicos del alumno.
+type StudentProfile struct {
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Role      string        `json:"role"`
+	Analytics []SubjectStat `json:"analytics"`
+}
+
 // Repository operaciones de persistencia del Moodle Avanzado.
 type Repository interface {
 	AccountByID(ctx context.Context, id string) (*Account, error)
@@ -129,4 +154,6 @@ type Repository interface {
 	GradeSubmission(ctx context.Context, resourceID, studentID string, grade float64, feedback string) error
 	GetSubmissions(ctx context.Context, resourceID string) ([]Submission, error)
 	HasSubmitted(ctx context.Context, resourceID, studentID string) (bool, time.Time, *float64, error)
+
+	GetStudentAnalytics(ctx context.Context, studentID string) ([]SubjectStat, error)
 }
