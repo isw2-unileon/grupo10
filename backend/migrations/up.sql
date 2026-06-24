@@ -88,6 +88,16 @@ CREATE INDEX IF NOT EXISTS idx_notes_author  ON notes(author_id);
 CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(subject_id);
 CREATE INDEX IF NOT EXISTS idx_notes_status  ON notes(status);
 
+-- Class groups (ADR-002) — defined here because note_shares references it.
+CREATE TABLE IF NOT EXISTS class_groups (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name       VARCHAR(200) NOT NULL,
+    owner_id   UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_class_groups_owner ON class_groups(owner_id);
+
 -- Note shares (viewer | editor)
 DO $$ BEGIN
     CREATE TYPE share_role AS ENUM ('viewer', 'editor');
@@ -176,15 +186,7 @@ CREATE INDEX IF NOT EXISTS idx_tutoring_event ON tutoring_bookings(event_id);
 -- so students who have not signed up yet can already be listed.
 -- ============================================================
 
--- A class group owned by a teacher.
-CREATE TABLE IF NOT EXISTS class_groups (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name       VARCHAR(200) NOT NULL,
-    owner_id   UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_class_groups_owner ON class_groups(owner_id);
+-- class_groups is defined earlier (before note_shares, which references it).
 
 -- Student roster, keyed by email (always stored as lower(trim(email))).
 CREATE TABLE IF NOT EXISTS group_members (
