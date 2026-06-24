@@ -1,9 +1,11 @@
 module github.com/isw2-unileon/grupo10
 
-go 1.24
+go 1.24.1
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/lib/pq v1.12.3
 	golang.org/x/crypto v0.31.0
 )
+
+require github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728

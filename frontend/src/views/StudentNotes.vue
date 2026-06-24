@@ -274,7 +274,7 @@ function formatStatus(status: string) {
         <button @click="switchView('list')" :class="{'active': currentView === 'list'}" class="nav-btn">📋 Biblioteca</button>
         <button @click="switchView('shared')" :class="{'active': currentView === 'shared'}" class="nav-btn shared-tab">🤝 Comunidad</button>
         <button @click="switchView('editor')" :class="{'active': currentView === 'editor'}" class="nav-btn">✍️ Redactar</button>
-        <button @click="switchView('upload')" :class="{'active': currentView === 'upload'}" class="nav-btn">📄 Word</button>
+        <button @click="switchView('upload')" :class="{'active': currentView === 'upload'}" class="nav-btn">📄 Importar</button>
       </div>
     </header>
 
@@ -283,7 +283,7 @@ function formatStatus(status: string) {
       <div v-if="!loading && notes.length === 0" class="empty-state">
         <div class="empty-icon">📚</div>
         <h3>Tu biblioteca está vacía</h3>
-        <p>Crea un apunte manual o sube un archivo de Word para empezar.</p>
+        <p>Crea un apunte manual o importa un archivo (.docx o .pdf) para empezar.</p>
       </div>
 
       <div class="notes-grid" v-if="notes.length > 0">
@@ -387,7 +387,7 @@ function formatStatus(status: string) {
 
     <main v-else-if="currentView === 'upload'" class="view-upload">
       <div class="upload-container">
-        <h2>📄 Importar Word</h2>
+        <h2>📄 Importar documento</h2>
         <div class="upload-card">
           <div class="form-group">
             <label>Título</label>
@@ -395,8 +395,8 @@ function formatStatus(status: string) {
           </div>
           <div class="form-group file-wrapper">
             <label class="custom-file-upload">
-              <input type="file" @change="handleFileChange" accept=".docx" />
-              📁 Elegir (.docx)
+              <input type="file" @change="handleFileChange" accept=".docx,.pdf" />
+              📁 Elegir (.docx o .pdf)
             </label>
             <span class="file-name-preview" v-if="selectedFile">{{ selectedFile.name }}</span>
           </div>
