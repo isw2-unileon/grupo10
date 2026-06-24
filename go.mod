@@ -7,5 +7,3 @@ require (
 	github.com/lib/pq v1.12.3
 	golang.org/x/crypto v0.31.0
 )
-
-require github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728

@@ -5,14 +5,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
-
-	"github.com/ledongthuc/pdf"
 
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 )
@@ -214,18 +210,14 @@ func (h *Handler) uploadNote(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	var content string
-	switch strings.ToLower(filepath.Ext(fileHeader.Filename)) {
-	case ".docx":
-		content, err = extractTextFromDocx(file, fileHeader.Size)
-	case ".pdf":
-		content, err = extractTextFromPDF(file, fileHeader.Size)
-	default:
-		http.Error(w, "Formato no soportado. Sube un archivo .docx o .pdf", http.StatusBadRequest)
+	if !strings.EqualFold(filepath.Ext(fileHeader.Filename), ".docx") {
+		http.Error(w, "Formato no soportado. Sube un archivo .docx", http.StatusBadRequest)
 		return
 	}
+
+	content, err := extractTextFromDocx(file, fileHeader.Size)
 	if err != nil {
-		http.Error(w, "No se pudo procesar el archivo. Asegúrate de que es un .docx o .pdf válido: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "No se pudo procesar el documento. Asegúrate de que es un .docx válido: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -289,34 +281,6 @@ func extractTextFromDocx(file multipart.File, size int64) (string, error) {
 				textBuilder.WriteString("\n\n") // Añadimos saltos de línea para que quede bonito
 			}
 		}
-	}
-
-	return strings.TrimSpace(textBuilder.String()), nil
-}
-
-// extractTextFromPDF extrae el texto plano de un archivo PDF.
-// Recupera de un posible panic de la librería ante PDFs malformados y lo
-// convierte en un error normal.
-func extractTextFromPDF(file multipart.File, size int64) (content string, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("el PDF está dañado o no se pudo leer: %v", r)
-		}
-	}()
-
-	reader, err := pdf.NewReader(file, size)
-	if err != nil {
-		return "", err
-	}
-
-	plain, err := reader.GetPlainText()
-	if err != nil {
-		return "", err
-	}
-
-	var textBuilder strings.Builder
-	if _, err := io.Copy(&textBuilder, plain); err != nil {
-		return "", err
 	}
 
 	return strings.TrimSpace(textBuilder.String()), nil
