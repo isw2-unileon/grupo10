@@ -52,6 +52,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/resources/{resourceId}/quiz", auth(http.HandlerFunc(h.getQuiz)))
 	mux.Handle("POST /api/resources/{resourceId}/submit-quiz", auth(http.HandlerFunc(h.submitQuiz)))
 	mux.Handle("GET /api/resources/{resourceId}/review/{studentId}", auth(http.HandlerFunc(h.getQuizReview)))
+
+	mux.Handle("GET /api/me/profile", auth(http.HandlerFunc(h.getProfile)))
+	mux.Handle("GET /api/groups/{id}/students/{studentId}/stats", auth(http.HandlerFunc(h.getStudentStatsForTeacher)))
 }
 
 func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
@@ -457,4 +460,30 @@ func writeError(w http.ResponseWriter, err error) {
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
+}
+
+func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	prof, err := h.svc.GetStudentProfile(r.Context(), uID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prof)
+}
+
+func (h *Handler) getStudentStatsForTeacher(w http.ResponseWriter, r *http.Request) {
+	uID, ok := authUser(w, r)
+	if !ok {
+		return
+	}
+	stats, err := h.svc.GetStudentStatsForTeacher(r.Context(), uID, r.PathValue("id"), r.PathValue("studentId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
 }

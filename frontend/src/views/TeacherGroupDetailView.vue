@@ -33,11 +33,49 @@
 
           <h3 style="color: #1e293b;">👥 Alumnos Matriculados ({{ miembros.length }})</h3>
           <ul v-if="miembros.length > 0" style="list-style: none; padding: 0; margin: 0;">
-            <li v-for="alumno in miembros" :key="alumno.id" style="padding: 12px 0; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
-              <span style="color: #334155; word-break: break-all;">📧 {{ alumno.email }}</span>
-              <button @click="expulsarAlumno(alumno.id)" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Desmatricular Alumno">
-                🗑️
-              </button>
+            <li v-for="alumno in miembros" :key="alumno.id" style="padding: 12px 0; border-bottom: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #334155; word-break: break-all;">📧 {{ alumno.email }}</span>
+                <div style="display: flex; gap: 5px;">
+                  <button @click="verEstadisticasAlumno(alumno.id)" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Ver Estadísticas">
+                    📊
+                  </button>
+                  <button @click="expulsarAlumno(alumno.id)" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Desmatricular Alumno">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+
+              <!-- PANEL DESPLEGABLE ULTRA SEGURO -->
+              <div v-if="viendoEstadisticasDe === alumno.id" style="background: #eff6ff; padding: 15px; border-radius: 6px; border: 1px solid #bfdbfe; margin-top: 5px;">
+                <h5 style="margin: 0 0 10px 0; color: #1e40af; font-size: 0.95rem;">📊 Rendimiento del Alumno</h5>
+                
+                <div v-if="!estadisticasAlumno">
+                  <span style="color: #64748b; font-size: 0.85rem;">Cargando expediente...</span>
+                </div>
+                <div v-else>
+                  <p style="margin: 0 0 12px 0; font-weight: bold; color: #0f172a; font-size: 0.9rem;">
+                    Nota Media Global: 
+                    <span :style="{ color: Number(estadisticasAlumno.total_average || 0) >= 5 ? '#166534' : '#991b1b' }">
+                      {{ Number(estadisticasAlumno.total_average || 0).toFixed(2) }}/10
+                    </span>
+                  </p>
+                  
+                  <div v-if="!estadisticasAlumno.sections || estadisticasAlumno.sections.length === 0" style="color: #64748b; font-style: italic; font-size: 0.8rem;">
+                    No hay temas estructurados en esta asignatura.
+                  </div>
+                  
+                  <div v-for="sec in (estadisticasAlumno.sections || [])" :key="sec.section_id" style="margin-bottom: 6px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #93c5fd; padding-bottom: 4px;">
+                    <div>
+                      <span style="color: #334155; display: block; font-weight: bold;">📁 {{ sec.section_title }}</span>
+                      <span style="color: #64748b; font-size: 0.75rem;">{{ sec.graded_count }} trabajos evaluados</span>
+                    </div>
+                    <strong :style="{ color: Number(sec.average || 0) >= 5 ? '#166534' : '#991b1b', fontSize: '1rem' }">
+                      {{ Number(sec.average || 0).toFixed(2) }}
+                    </strong>
+                  </div>
+                </div>
+              </div>
             </li>
           </ul>
           <div v-else style="color: #64748b; font-style: italic; font-size: 0.9rem; text-align: center; padding: 20px 0;">
@@ -131,7 +169,7 @@
 
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                   <button @click="seccionActivaForm = null" style="padding: 8px 16px; background: white; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">Cancelar</button>
-                  <button @click="guardarContenidoEnServidor(sec.id)" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Guardar Elemento</button>
+                  <button @click="guardarContenidoEnServidor(sec.id)" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Save Elemento</button>
                 </div>
               </div>
 
@@ -249,6 +287,9 @@ const nuevoEmail = ref('')
 const nuevoTemaTitulo = ref('')
 const seccionActivaForm = ref(null)
 
+const viendoEstadisticasDe = ref(null)
+const estadisticasAlumno = ref(null)
+
 const objetoRecursoVacio = () => ({
   type: 'file',
   title: '',
@@ -264,7 +305,6 @@ const entregasAlumnos = ref([])
 const notasFormulario = ref({})
 const feedbackFormulario = ref({})
 
-// Estados para la inspección visual de exámenes por el profesor
 const examenInspeccionado = ref(null)
 const examenInspeccionadoStudentId = ref(null)
 
@@ -343,7 +383,6 @@ const eliminarSeccionCompleta = async (sectionId) => {
   } catch (e) { console.error(e) }
 }
 
-// ✏️ Funciones de Edición Añadidas
 const editarSeccion = async (sec) => {
   const nuevoTitulo = prompt("Modificar título del tema:", sec.title)
   if (!nuevoTitulo || nuevoTitulo === sec.title) return
@@ -491,7 +530,6 @@ const enviarCalificacion = async (resId, studentId) => {
   } catch (e) { console.error(e) }
 }
 
-// NUEVO: Ver examen detallado del alumno
 const verExamenDetalladoAlumno = async (resourceId, studentId) => {
   if (examenInspeccionadoStudentId.value === studentId) {
     examenInspeccionado.value = null
@@ -507,7 +545,6 @@ const verExamenDetalladoAlumno = async (resourceId, studentId) => {
   } catch (e) { console.error(e) }
 }
 
-// Descarga inteligente de blobs para las tareas
 const descargarArchivoSeguro = async (filePath, title) => {
   try {
     const res = await fetch(`/api/uploads/${filePath}`, {
@@ -525,6 +562,35 @@ const descargarArchivoSeguro = async (filePath, title) => {
   } catch (error) {
     alert("No se pudo descargar el archivo.")
     console.error(error)
+  }
+}
+
+// FUNCIÓN DE ESTADÍSTICAS REPARADA COMPLEMENTADA CON PARSEO DEFENSIVO
+const verEstadisticasAlumno = async (studentId) => {
+  if (viendoEstadisticasDe.value === studentId) {
+    viendoEstadisticasDe.value = null
+    return
+  }
+  try {
+    const res = await fetch(`/api/groups/${grupoId}/students/${studentId}/stats`, { headers: getHeaders() })
+    if (res.ok) {
+      const data = await res.json()
+      
+      // Si la API de Go envía las secciones nulas o ausentes, forzamos un array vacío reactivo
+      if (!data || !data.sections) {
+        if (data) data.sections = []
+      }
+      
+      estadisticasAlumno.value = data
+      viendoEstadisticasDe.value = studentId
+    } else {
+      estadisticasAlumno.value = { total_average: 0, sections: [] }
+      viendoEstadisticasDe.value = studentId
+    }
+  } catch (e) { 
+    console.error(e)
+    estadisticasAlumno.value = { total_average: 0, sections: [] }
+    viendoEstadisticasDe.value = studentId
   }
 }
 
