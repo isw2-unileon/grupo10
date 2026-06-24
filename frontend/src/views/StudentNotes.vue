@@ -155,6 +155,8 @@ async function uploadDocument() {
       uploadTitle.value = ''
       selectedFile.value = null
       currentView.value = 'list'
+    } else {
+      alert(`No se pudo importar el documento: ${(await res.text()) || res.statusText}`)
     }
   } catch (e) { alert('Error al subir documento') }
 }
@@ -283,7 +285,7 @@ function formatStatus(status: string) {
       <div v-if="!loading && notes.length === 0" class="empty-state">
         <div class="empty-icon">📚</div>
         <h3>Tu biblioteca está vacía</h3>
-        <p>Crea un apunte manual o importa un archivo (.docx o .pdf) para empezar.</p>
+        <p>Crea un apunte manual o importa un archivo (.docx) para empezar.</p>
       </div>
 
       <div class="notes-grid" v-if="notes.length > 0">
@@ -395,8 +397,8 @@ function formatStatus(status: string) {
           </div>
           <div class="form-group file-wrapper">
             <label class="custom-file-upload">
-              <input type="file" @change="handleFileChange" accept=".docx,.pdf" />
-              📁 Elegir (.docx o .pdf)
+              <input type="file" @change="handleFileChange" accept=".docx" />
+              📁 Elegir (.docx)
             </label>
             <span class="file-name-preview" v-if="selectedFile">{{ selectedFile.name }}</span>
           </div>
