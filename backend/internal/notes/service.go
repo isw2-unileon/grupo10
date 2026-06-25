@@ -11,14 +11,18 @@ import (
 	"os"
 )
 
+// defaultGroqURL es el endpoint de la API de Groq usado en producción.
+const defaultGroqURL = "https://api.groq.com/openai/v1/chat/completions"
+
 // Service contiene la lógica de negocio de los apuntes.
 type Service struct {
-	repo Repository
+	repo  Repository
+	aiURL string
 }
 
 // NewService inicializa un nuevo servicio de apuntes.
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, aiURL: defaultGroqURL}
 }
 
 // CreateNote procesa la creación de un nuevo apunte.
@@ -101,7 +105,7 @@ func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) e
 		return fmt.Errorf("error al empaquetar JSON: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.aiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("error al crear petición HTTP: %w", err)
 	}
