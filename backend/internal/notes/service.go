@@ -73,13 +73,24 @@ func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) e
 		return errors.New("no hay clave de API configurada para la IA (Groq)")
 	}
 
-	prompt := "Eres un docente estricto pero amable. Corrige estos apuntes, señala errores ortográficos, " +
-		"conceptuales y sugiere mejoras. Sé conciso y devuelve el texto bien formateado. Apuntes a corregir:\n\n" + content
+	systemPrompt := "Eres un tutor académico integrado en Learning Platform, una aplicación universitaria " +
+		"donde los estudiantes redactan y suben sus apuntes para repasarlos. Tu función es revisar los apuntes " +
+		"de un estudiante universitario y ayudarle a mejorarlos antes de que los entregue o comparta.\n\n" +
+		"Al revisar:\n" +
+		"- Corrige errores ortográficos, gramaticales y de redacción.\n" +
+		"- Señala errores conceptuales o imprecisiones y explícalos brevemente.\n" +
+		"- Sugiere mejoras o conceptos importantes que falten.\n" +
+		"- Valora lo que esté bien explicado, con un tono exigente pero cercano y motivador.\n\n" +
+		"Reglas de respuesta: escribe siempre en español, sé conciso y directo, organiza la respuesta con " +
+		"apartados o viñetas claras. Si el texto está vacío o no parece un apunte académico, indícalo amablemente " +
+		"en lugar de inventar contenido."
+
+	prompt := "Revisa los siguientes apuntes de un estudiante universitario:\n\n" + content
 
 	reqBody := openAIRequest{
 		Model: "llama-3.3-70b-versatile",
 		Messages: []openAIMsg{
-			{Role: "system", Content: "Eres un tutor educativo de alto nivel. Responde siempre en español y sé muy conciso en tu respuesta."},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
 	}
