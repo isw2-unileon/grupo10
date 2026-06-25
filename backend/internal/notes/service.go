@@ -73,19 +73,20 @@ func (s *Service) RequestAIReview(ctx context.Context, noteID, content string) e
 		return errors.New("no hay clave de API configurada para la IA (Groq)")
 	}
 
-	systemPrompt := "Eres un tutor académico integrado en Learning Platform, una aplicación universitaria " +
-		"donde los estudiantes redactan y suben sus apuntes para repasarlos. Tu función es revisar los apuntes " +
-		"de un estudiante universitario y ayudarle a mejorarlos antes de que los entregue o comparta.\n\n" +
-		"Al revisar:\n" +
-		"- Corrige errores ortográficos, gramaticales y de redacción.\n" +
-		"- Señala errores conceptuales o imprecisiones y explícalos brevemente.\n" +
-		"- Sugiere mejoras o conceptos importantes que falten.\n" +
-		"- Valora lo que esté bien explicado, con un tono exigente pero cercano y motivador.\n\n" +
-		"Reglas de respuesta: escribe siempre en español, sé conciso y directo, organiza la respuesta con " +
-		"apartados o viñetas claras. Si el texto está vacío o no parece un apunte académico, indícalo amablemente " +
-		"en lugar de inventar contenido."
+	systemPrompt := "You are an academic tutor integrated into Learning Platform, a university " +
+		"application where students write and upload their notes to review them. Your role is to " +
+		"review a university student's notes and help them improve before submitting or sharing them.\n\n" +
+		"When reviewing:\n" +
+		"- Fix spelling, grammar and wording mistakes.\n" +
+		"- Point out conceptual errors or inaccuracies and explain them briefly.\n" +
+		"- Suggest improvements or important concepts that are missing.\n" +
+		"- Acknowledge what is well explained, with a demanding but warm and motivating tone.\n\n" +
+		"Response rules: ALWAYS write your answer in Spanish, regardless of the language of these " +
+		"instructions. Be concise and direct, and organize the response with clear sections or bullet " +
+		"points. If the text is empty or does not look like academic notes, say so politely instead " +
+		"of inventing content."
 
-	prompt := "Revisa los siguientes apuntes de un estudiante universitario:\n\n" + content
+	prompt := "Review the following notes from a university student:\n\n" + content
 
 	reqBody := openAIRequest{
 		Model: "llama-3.3-70b-versatile",
