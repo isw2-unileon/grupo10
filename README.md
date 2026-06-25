@@ -129,6 +129,22 @@ Or run everything via the `Makefile`:
 make test
 ```
 
+### Integration tests (Postgres)
+
+The repository layer has integration tests that run against a **real Postgres**
+to validate the SQL against the actual schema. They are behind the `integration`
+build tag and skip themselves unless `TEST_DATABASE_URL` is set, so the regular
+`go test ./...` above stays database-free and never fails on a fresh clone.
+
+CI runs them automatically against a disposable Postgres service, so you don't
+need anything for pull requests. To run them locally, point the variable at a
+**throwaway** Postgres (the tests `TRUNCATE` tables — never use your dev DB):
+
+```bash
+export TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+go test -tags integration ./backend/internal/notes/
+```
+
 ## Running the frontend (dev)
 
 The frontend is a Vue 3 + Vite SPA in [`frontend/`](frontend/README.md). With
