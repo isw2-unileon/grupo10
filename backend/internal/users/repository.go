@@ -31,7 +31,9 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 const selectUserQuery = `
     SELECT u.id, u.role_id, r.name, u.name, u.email, u.password_hash, u.created_at
     FROM users u
-    JOIN roles r ON r.id = u.role_id`
+    -- Mismo cast a ::text que en selectUserByEmailQuery: en Render role_id y roles.id
+    -- pueden tener tipos distintos (UUID vs VARCHAR) y el JOIN directo falla con un 500.
+    JOIN roles r ON r.id::text = u.role_id::text`
 
 // 2. Crea una consulta ESPECÍFICA para el login por Email, asegurando compatibilidad de tipos
 const selectUserByEmailQuery = `
