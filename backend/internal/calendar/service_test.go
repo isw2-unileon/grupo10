@@ -62,7 +62,8 @@ func TestCreateTutoringSlot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.CreateTutoringSlot("professor-uuid", "Tutoría de Go", tt.startsAt, tt.endsAt)
+			// ⚠️ CORREGIDO: Añadimos la descripción ("Descripción de prueba") como tercer parámetro
+			_, err := svc.CreateTutoringSlot("professor-uuid", "Tutoría de Go", "Descripción de prueba", tt.startsAt, tt.endsAt)
 
 			// FIX DEL LINTER: Usar errors.Is en lugar de err != expectedErr
 			if !errors.Is(err, tt.expectedErr) {
