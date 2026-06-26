@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS notes (
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- Reconcile pre-existing `notes` tables: CREATE TABLE IF NOT EXISTS above is a
+-- no-op when the table already exists, so databases first created with the old
+-- schema keep `subject_id NOT NULL` and lack `teacher_feedback`. These ALTERs are
+-- idempotent and bring those older databases (e.g. the persistent Render DB) in
+-- line with the definition above on the next startup.
+ALTER TABLE notes ALTER COLUMN subject_id DROP NOT NULL;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS teacher_feedback TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_notes_author  ON notes(author_id);
 CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(subject_id);
 CREATE INDEX IF NOT EXISTS idx_notes_status  ON notes(status);
