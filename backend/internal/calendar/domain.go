@@ -10,14 +10,15 @@ import (
 
 // Event representa un hueco en el calendario (ej. "Tutoría de Programación")
 type Event struct {
-	ID        string    `json:"id"`
-	OwnerID   string    `json:"owner_id"`             // Professor ID
-	SubjectID *string   `json:"subject_id,omitempty"` // Puntero porque en SQL permite NULL
-	Title     string    `json:"title"`
-	Type      string    `json:"type"` // 'tutoring', 'deadline', 'exam', 'other'
-	StartsAt  time.Time `json:"starts_at"`
-	EndsAt    time.Time `json:"ends_at"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	OwnerID     string    `json:"owner_id"`             // Professor ID
+	SubjectID   *string   `json:"subject_id,omitempty"` // Puntero porque en SQL permite NULL
+	Title       string    `json:"title"`
+	Description string    `json:"description"` // ✅ ¡Perfecto!
+	Type        string    `json:"type"`        // 'tutoring', 'deadline', 'exam', 'other'
+	StartsAt    time.Time `json:"starts_at"`
+	EndsAt      time.Time `json:"ends_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Booking representa a un alumno que ha reservado una tutoría
@@ -34,7 +35,6 @@ type Booking struct {
 // ==========================================
 
 // Repository define qué operaciones le vamos a pedir a Postgres.
-// Al usar una interfaz, si mañana cambiamos Postgres por MySQL, el resto del código ni se entera.
 type Repository interface {
 	CreateEvent(event *Event) error
 	GetAvailableTutorings() ([]Event, error)
@@ -42,9 +42,9 @@ type Repository interface {
 }
 
 // Service define los casos de uso (lo que el usuario quiere hacer realmente).
-// El handler llamará a esto, y esto llamará al Repository.
 type Service interface {
-	CreateTutoringSlot(ownerID, title string, startsAt, endsAt time.Time) (*Event, error)
+	// ⚠️ CORREGIDO: Añadido "description string" a la interfaz
+	CreateTutoringSlot(ownerID, title, description string, startsAt, endsAt time.Time) (*Event, error)
 	ListAvailableTutorings() ([]Event, error)
 	BookTutoring(eventID, studentID string) (*Booking, error)
 }

@@ -1,41 +1,34 @@
-<template>
-  <div class="calendar-container">
-    <h1>Mi Calendario 📅</h1>
-    
-    <div class="calendar-wrapper">
-      <FullCalendar :options="calendarOptions" />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-// 1. Importamos la tienda del usuario de tu compi
+import timeGridPlugin from '@fullcalendar/timegrid' // ⏱️ NUEVO: Para ver las horas del día
+
 import { useAuthStore } from '@/stores/auth' 
 
-// 2. Inicializamos la tienda
 const auth = useAuthStore()
 
-const alHacerClicEnUnDia = async (info: any) => {
-  // 3. ¡EL GUARDIA DE SEGURIDAD! Si no es profe, lo echamos.
+// 🚀 NUEVA FUNCIÓN: Ahora usamos "select" al arrastrar en lugar de "dateClick"
+const alSeleccionarRango = async (info: any) => {
   if (auth.user?.role !== 'teacher') {
     alert("¡Quieto ahí! Solo los profesores pueden crear tutorías. 🛑")
     return
   }
 
-  const titulo = prompt(`¿Qué tutoría quieres crear para el día ${info.dateStr}?`)
-  
-  if (!titulo) return
+  // 1. Pedimos Título y Descripción
+  const titulo = prompt("¿Qué título le ponemos a la tutoría?")
+  if (!titulo) return // Si cancela, salimos
 
-  // 4. Usamos el ID REAL del profesor que ha iniciado sesión
+  const descripcion = prompt("Añade los detalles o descripción (opcional):")
+
+  // 2. FullCalendar nos da las horas exactas que hemos arrastrado
   const nuevoEvento = {
-    owner_id: auth.user.id, // <-- ¡Adiós al UUID robado!
+    owner_id: auth.user.id,
     title: titulo,
-    starts_at: info.dateStr + "T10:00:00Z",
-    ends_at: info.dateStr + "T11:00:00Z"
+    description: descripcion || "", // Mandamos la descripción a Go
+    starts_at: info.startStr,       // Hora de inicio exacta del arrastre
+    ends_at: info.endStr            // Hora de fin exacta del arrastre
   }
 
   try {
@@ -45,36 +38,36 @@ const alHacerClicEnUnDia = async (info: any) => {
       body: JSON.stringify(nuevoEvento)
     })
 
-    if (response.ok) {
-      cargarEventosDeBD()
-    } else {
-      alert("Error al crear la tutoría en el servidor")
+    // 3. ¡Capturamos los errores del backend (como el de viajar al pasado)!
+    if (!response.ok) {
+      const errorTexto = await response.text()
+      alert(`⚠️ No se pudo crear la tutoría:\n${errorTexto}`)
+      return
     }
+
+    alert("¡Tutoría creada con éxito! 📅🎉")
+    cargarEventosDeBD()
   } catch (error) {
     console.error("Error de conexión:", error)
+    alert("🚨 Error de red al conectar con el servidor.")
   }
 }
+
 const alHacerClicEnUnEvento = async (info: any) => {
-  // 1. ¡Control de seguridad! Solo los alumnos reservan
   if (auth.user?.role !== 'student') {
     alert("Los profesores no pueden reservar tutorías, ¡que son los que las dan! 👨‍🏫")
     return
   }
 
-  
-
-  // 2. Preguntamos confirmación al alumno
   const confirmar = confirm(`¿Quieres reservar la tutoría "${info.event.title}"?`)
   if (!confirmar) return
 
-  // 3. Preparamos los datos para el endpoint de reservar que hizo tu compi
   const datosReserva = {
-    event_id: info.event.id,  // El ID de la tutoría que viene de la BD
-    student_id: auth.user.id     // El ID del alumno logueado
+    event_id: info.event.id,
+    student_id: auth.user.id
   }
 
   try {
-    // 4. Lanzamos la petición POST a /book
     const response = await fetch('/api/tutorings/book', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,88 +76,104 @@ const alHacerClicEnUnEvento = async (info: any) => {
 
     if (response.ok) {
       alert("¡Tutoría reservada con éxito! 📅🎉")
-      // Refrescamos el calendario para que se vean los cambios
       cargarEventosDeBD()
     } else {
       const errorData = await response.json().catch(() => ({}))
-      alert(errorData.message || "Error al procesar la reserva en el servidor")
+      alert(`⚠️ ${errorData.message || "Error al procesar la reserva en el servidor"}`)
     }
   } catch (error) {
     console.error("Error al conectar con el servidor:", error)
   }
 }
 
-// 5. Añadimos el plugin y el evento click a la configuración del calendario
-const calendarOptions = ref({
-  plugins: [dayGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
-  events: [],
-  locale: 'es',
-  firstDay: 1,
-  dateClick: alHacerClicEnUnDia,       
-  eventClick: alHacerClicEnUnEvento,   
-  headerToolbar: {
-    left: 'prev,next today',
-    center: 'title',
-    right: 'dayGridMonth'
-  }
-})
-
-// 3. Función asíncrona para pedir datos a Go
 const cargarEventosDeBD = async () => {
   try {
-    // 1. Corregimos la ruta para que coincida con Go
     const response = await fetch('/api/tutorings') 
-    
-    if (!response.ok) {
-      throw new Error('Fallo al conectar con Go')
-    }
+    if (!response.ok) throw new Error('Fallo al conectar con Go')
 
     const datosDeGo = await response.json()
     
-    // 2. TRADUCCIÓN: Adaptamos los nombres de Go a los de FullCalendar
-    const eventosParaCalendario = datosDeGo.map((evento: any) => ({
+    calendarOptions.value.events = datosDeGo.map((evento: any) => ({
         id: evento.id,
         title: evento.title,
-        start: evento.starts_at, // FullCalendar necesita "start"
-        end: evento.ends_at,     // FullCalendar necesita "end"
-        color: '#42b883'         // Les ponemos color verde Vue
+        start: evento.starts_at, 
+        end: evento.ends_at,     
+        color: '#42b883',
+        // Podemos guardar la descripción dentro del evento para usarla luego si queréis
+        extendedProps: {
+          description: evento.description
+        }
     }))
-    
-    // 3. Metemos los datos traducidos en el calendario
-    calendarOptions.value.events = eventosParaCalendario
-
   } catch (error) {
     console.error("🚨 Error pidiendo eventos al servidor:", error)
   }
 }
 
-// 5. Le decimos a Vue: "En cuanto la pantalla cargue, ejecuta esta función"
+const calendarOptions = ref({
+  // Añadimos el plugin de las horas
+  plugins: [dayGridPlugin, interactionPlugin, timeGridPlugin],
+  initialView: 'timeGridWeek',         // ⏱️ Empezamos viendo la semana con horas
+  selectable: true,                    // 🖱️ ¡Activamos el arrastrar y soltar!
+  select: alSeleccionarRango,          // Llamamos a la nueva función al arrastrar
+  eventClick: alHacerClicEnUnEvento,   
+  events: [],
+  locale: 'es',
+  firstDay: 1,
+  slotMinTime: '08:00:00',             // El calendario empieza a las 8am
+  slotMaxTime: '21:00:00',             // Y acaba a las 9pm
+  headerToolbar: {
+    left: 'prev,next today',
+    center: 'title',
+    // Añadimos los botones para cambiar entre mes, semana y día
+    right: 'dayGridMonth,timeGridWeek,timeGridDay' 
+  }
+})
+
 onMounted(() => {
   console.log("El componente ha nacido. Voy a pedir los eventos...")
   cargarEventosDeBD()
 })
 </script>
+<template>
+  <div class="calendar-container">
+    <h1 class="calendar-title">📅 Calendario de Tutorías</h1>
+    
+    <FullCalendar :options="calendarOptions" />
+  </div>
+</template>
 
 <style scoped>
-/* Le damos un poco de estilo al fondo para que resalte */
+/* Un poco de chapa y pintura para que no se vea feo ni ocupe el 200% de la pantalla */
 .calendar-container {
-  padding: 20px;
-  max-width: 900px; /* Lo hacemos más ancho para que quepa bien el mes */
+  max-width: 1100px;
   margin: 0 auto;
-}
-
-.calendar-wrapper {
-  background: white;
   padding: 20px;
+  background-color: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
-/* Hacemos que el título quede centrado y bonito */
-h1 {
+.calendar-title {
   text-align: center;
   color: #2c3e50;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+/* Usamos :deep() porque los estilos de FullCalendar se generan dinámicamente 
+  y si no, Vue los ignoraría al tener "scoped" 
+*/
+:deep(.fc-event) {
+  cursor: pointer; /* Hace que salga la manita al pasar por encima de las tutorías */
+  transition: transform 0.2s;
+}
+
+:deep(.fc-event:hover) {
+  transform: scale(1.02); /* Efecto chulo al hacer hover */
+}
+
+:deep(.fc-toolbar-title) {
+  text-transform: capitalize; /* Para que los meses salgan con la primera en mayúscula */
 }
 </style>

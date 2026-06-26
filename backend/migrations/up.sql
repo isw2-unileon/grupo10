@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     owner_id   UUID       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     subject_id UUID       REFERENCES subjects(id),
     title      VARCHAR(300) NOT NULL,
+    description TEXT,
     type       event_type   NOT NULL DEFAULT 'other',
     starts_at  TIMESTAMPTZ  NOT NULL,
     ends_at    TIMESTAMPTZ  NOT NULL,

@@ -23,10 +23,11 @@ func NewHandler(svc Service) *Handler {
 
 // CreateEventRequest representa el payload para crear un evento
 type CreateEventRequest struct {
-	OwnerID  string    `json:"owner_id"`
-	Title    string    `json:"title"`
-	StartsAt time.Time `json:"starts_at"`
-	EndsAt   time.Time `json:"ends_at"`
+	OwnerID     string    `json:"owner_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	StartsAt    time.Time `json:"starts_at"`
+	EndsAt      time.Time `json:"ends_at"`
 }
 
 // BookTutoringRequest representa el payload para reservar una tutoría
@@ -42,19 +43,23 @@ type BookTutoringRequest struct {
 // CreateTutoringHandler maneja el POST /tutorings
 func (h *Handler) CreateTutoringHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateEventRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
 		http.Error(w, "Formato JSON inválido", http.StatusBadRequest) // 400
 		return
 	}
 
 	// Delegamos toda la lógica compleja a nuestro Servicio
-	event, err := h.svc.CreateTutoringSlot(req.OwnerID, req.Title, req.StartsAt, req.EndsAt)
+	event, err := h.svc.CreateTutoringSlot(req.OwnerID, req.Title, req.Description, req.StartsAt, req.EndsAt)
 	if err != nil {
 		// Comprobamos si es uno de nuestros errores de negocio personalizados
 		if errors.Is(err, ErrInvalidDates) || errors.Is(err, ErrPastDate) {
+
 			http.Error(w, err.Error(), http.StatusBadRequest) // 400
 			return
 		}
+
 		http.Error(w, "Error interno del servidor", http.StatusInternalServerError) // 500
 		return
 	}
