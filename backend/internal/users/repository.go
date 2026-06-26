@@ -27,10 +27,19 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
+// 1. Deja selectUserQuery solo para buscar por ID (manteniendo su lógica)
 const selectUserQuery = `
-	SELECT u.id, u.role_id, r.name, u.name, u.email, u.password_hash, u.created_at
-	FROM users u
-	JOIN roles r ON r.id = u.role_id`
+    SELECT u.id, u.role_id, r.name, u.name, u.email, u.password_hash, u.created_at
+    FROM users u
+    JOIN roles r ON r.id = u.role_id`
+
+// 2. Crea una consulta ESPECÍFICA para el login por Email, asegurando compatibilidad de tipos
+const selectUserByEmailQuery = `
+    SELECT u.id, u.role_id, r.name, u.name, u.email, u.password_hash, u.created_at
+    FROM users u
+    -- Usamos ::text en ambos lados para que, tengan el tipo que tengan en Render (UUID o Varchar), Postgres los compare como texto sin quejarse
+    JOIN roles r ON r.id::text = u.role_id::text
+    WHERE u.email = $1`
 
 // RoleIDByName resolves a role name ("student"/"teacher") to its UUID.
 func (r *PostgresRepository) RoleIDByName(ctx context.Context, name string) (string, error) {
@@ -58,7 +67,8 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, u *User) error {
 
 // GetByEmail returns the user with the given email, or ErrUserNotFound.
 func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
-	return scanUser(r.db.QueryRowContext(ctx, selectUserQuery+` WHERE u.email = $1`, email))
+	// Usamos la nueva query limpia y directa
+	return scanUser(r.db.QueryRowContext(ctx, selectUserByEmailQuery, email))
 }
 
 // GetByID returns the user with the given UUID, or ErrUserNotFound.
