@@ -215,7 +215,7 @@ func (h *Handler) uploadNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := extractTextFromDocx(file, fileHeader.Size)
+	content, err := ExtractTextFromDocx(file, fileHeader.Size)
 	if err != nil {
 		http.Error(w, "No se pudo procesar el documento. Asegúrate de que es un .docx válido: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -232,10 +232,12 @@ func (h *Handler) uploadNote(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(note)
 }
 
-// extractTextFromDocx extrae el texto plano de un archivo ZIP/DOCX.
+// ExtractTextFromDocx extrae el texto plano de un archivo ZIP/DOCX. Es público
+// para que otros módulos (p. ej. la generación de tests con IA en groups) puedan
+// reutilizar el mismo parseo sin duplicarlo.
 //
 //nolint:gocognit // El parseo de XML requiere un switch anidado complejo.
-func extractTextFromDocx(file multipart.File, size int64) (string, error) {
+func ExtractTextFromDocx(file multipart.File, size int64) (string, error) {
 	zr, err := zip.NewReader(file, size)
 	if err != nil {
 		return "", err
