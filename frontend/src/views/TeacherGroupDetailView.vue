@@ -151,7 +151,29 @@
 
                 <div v-if="nuevoRecurso.type === 'quiz'" style="background: white; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
                   <h5 style="margin: 0 0 10px 0; color: #1e293b; font-size: 1rem;">Preguntas del Test</h5>
-                  
+
+                  <div style="background: #eef2ff; border: 1px solid #c7d2fe; padding: 12px; border-radius: 6px; margin-bottom: 14px;">
+                    <h6 style="margin: 0 0 8px 0; color: #3730a3; font-size: 0.95rem;">🤖 Generar preguntas con IA</h6>
+                    <div style="margin-bottom: 8px;">
+                      <label style="font-size: 0.8rem; color: #475569;">Documento Word (.docx) con el material:</label>
+                      <input type="file" accept=".docx" @change="iaQuiz.fileObj = $event.target.files[0]" style="display: block; margin-top: 4px; font-size: 0.85rem;" />
+                    </div>
+                    <textarea v-model="iaQuiz.texto" rows="3" placeholder="…o pega aquí el material en texto" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; margin-bottom: 8px; box-sizing: border-box;"></textarea>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                      <select v-model="iaQuiz.dificultad" style="padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;">
+                        <option value="baja">Dificultad baja</option>
+                        <option value="media">Dificultad media</option>
+                        <option value="alta">Dificultad alta</option>
+                      </select>
+                      <input v-model.number="iaQuiz.numPreguntas" type="number" min="1" max="30" title="Número de preguntas" style="width: 70px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;" />
+                      <input v-model="iaQuiz.enfoque" type="text" placeholder="En qué centrarse (opcional)" style="flex: 1; min-width: 140px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;" />
+                    </div>
+                    <button @click="generarTestConIA" type="button" :disabled="iaQuiz.generando" style="padding: 6px 12px; background: #4f46e5; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold;">
+                      {{ iaQuiz.generando ? 'Generando…' : '✨ Generar preguntas' }}
+                    </button>
+                    <span v-if="iaQuiz.generando" style="margin-left: 8px; font-size: 0.8rem; color: #6366f1;">la IA está trabajando, puede tardar unos segundos…</span>
+                  </div>
+
                   <div v-for="(p, pIdx) in nuevoRecurso.questions" :key="pIdx" style="border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                     <div style="display: flex; gap: 10px; margin-bottom: 8px;">
                       <input v-model="p.question_text" type="text" :placeholder="`Pregunta ${pIdx + 1}`" style="flex: 1; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px;" />
@@ -165,6 +187,16 @@
                   <button @click="añadirPreguntaAlCuestionario" type="button" style="padding: 6px 12px; background: #e2e8f0; color: #334155; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold;">
                     ➕ Añadir Pregunta Tipo Test
                   </button>
+
+                  <div v-if="nuevoRecurso.questions.length > 0" style="background: #fef9c3; border: 1px solid #fde047; padding: 10px; border-radius: 6px; margin-top: 12px;">
+                    <label style="font-size: 0.8rem; color: #713f12; font-weight: bold;">🪄 Mejorar las preguntas con IA</label>
+                    <div style="display: flex; gap: 8px; margin-top: 6px;">
+                      <input v-model="iaQuiz.instruccion" type="text" placeholder="Ej: sube la dificultad, hazlas más técnicas, mejora la pregunta 2…" style="flex: 1; padding: 5px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;" />
+                      <button @click="mejorarTestConIA" type="button" :disabled="iaQuiz.mejorando" style="padding: 6px 12px; background: #ca8a04; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold; white-space: nowrap;">
+                        {{ iaQuiz.mejorando ? 'Mejorando…' : 'Mejorar' }}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -299,6 +331,18 @@ const objetoRecursoVacio = () => ({
   questions: []
 })
 const nuevoRecurso = ref(objetoRecursoVacio())
+
+// Estado del generador/mejorador de tests con IA.
+const iaQuiz = ref({
+  generando: false,
+  mejorando: false,
+  texto: '',
+  fileObj: null,
+  dificultad: 'media',
+  numPreguntas: 5,
+  enfoque: '',
+  instruccion: ''
+})
 
 const revisandoRecursoId = ref(null)
 const entregasAlumnos = ref([])
@@ -448,6 +492,63 @@ const marcarCorrectaRadio = (pIdx, oIdx) => {
 
 const eliminarPreguntaEstructura = (idx) => {
   nuevoRecurso.value.questions.splice(idx, 1)
+}
+
+// Genera preguntas con IA a partir de un .docx y/o texto. No guarda nada: rellena
+// el editor de preguntas para que el profesor las revise/edite antes de guardar.
+const generarTestConIA = async () => {
+  if (!iaQuiz.value.texto.trim() && !iaQuiz.value.fileObj) {
+    return alert('Sube un .docx o pega el material en texto.')
+  }
+  iaQuiz.value.generando = true
+  try {
+    const fd = new FormData()
+    if (iaQuiz.value.fileObj) fd.append('file', iaQuiz.value.fileObj)
+    if (iaQuiz.value.texto.trim()) fd.append('text', iaQuiz.value.texto)
+    fd.append('difficulty', iaQuiz.value.dificultad)
+    fd.append('num_questions', String(iaQuiz.value.numPreguntas))
+    fd.append('focus', iaQuiz.value.enfoque)
+
+    const res = await fetch('/api/quizzes/ai-generate', {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: fd
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'No se pudo generar el test')
+    nuevoRecurso.value.questions = data.questions || []
+    if (!nuevoRecurso.value.title.trim()) nuevoRecurso.value.title = 'Test generado con IA'
+  } catch (e) {
+    alert('IA: ' + e.message)
+  } finally {
+    iaQuiz.value.generando = false
+  }
+}
+
+// Mejora las preguntas actuales (subir dificultad, nivel, reformular...) según la
+// instrucción del profesor. Reemplaza las preguntas del editor con la versión mejorada.
+const mejorarTestConIA = async () => {
+  if (nuevoRecurso.value.questions.length === 0) {
+    return alert('Primero genera o añade preguntas.')
+  }
+  iaQuiz.value.mejorando = true
+  try {
+    const res = await fetch('/api/quizzes/ai-improve', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        instruction: iaQuiz.value.instruccion,
+        questions: nuevoRecurso.value.questions
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'No se pudo mejorar el test')
+    nuevoRecurso.value.questions = data.questions || []
+  } catch (e) {
+    alert('IA: ' + e.message)
+  } finally {
+    iaQuiz.value.mejorando = false
+  }
 }
 
 const guardarContenidoEnServidor = async (secId) => {

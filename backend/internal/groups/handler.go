@@ -3,11 +3,14 @@ package groups
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/isw2-unileon/grupo10/backend/internal/notes"
 	"github.com/isw2-unileon/grupo10/backend/internal/users"
 )
 
@@ -40,6 +43,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.Handle("POST /api/sections/{sectionId}/resources", auth(http.HandlerFunc(h.createResource)))
 	mux.Handle("POST /api/sections/{sectionId}/quizzes", auth(http.HandlerFunc(h.createQuiz)))
+	mux.Handle("POST /api/quizzes/ai-generate", auth(http.HandlerFunc(h.aiGenerateQuiz)))
+	mux.Handle("POST /api/quizzes/ai-improve", auth(http.HandlerFunc(h.aiImproveQuiz)))
 	mux.Handle("DELETE /api/resources/{resourceId}", auth(http.HandlerFunc(h.deleteResource)))
 	mux.Handle("GET /api/groups/{id}/content", auth(http.HandlerFunc(h.getGroupContent)))
 
@@ -260,6 +265,74 @@ func (h *Handler) createQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, res)
+}
+
+// aiGenerateQuiz builds quiz questions with AI from teaching material (a .docx
+// file and/or pasted text) plus difficulty, number of questions and focus. It
+// does NOT save anything: it returns the generated questions so the teacher can
+// review/edit them and then save through the normal create-quiz endpoint.
+func (h *Handler) aiGenerateQuiz(w http.ResponseWriter, r *http.Request) {
+	if _, ok := authUser(w, r); !ok {
+		return
+	}
+
+	//nolint:gosec // 10MB cap to bound memory while parsing the upload.
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		writeError(w, errors.New("archivo demasiado grande o formato inválido"))
+		return
+	}
+
+	content := strings.TrimSpace(r.FormValue("text"))
+	if file, fh, err := r.FormFile("file"); err == nil {
+		defer file.Close()
+		if !strings.EqualFold(filepath.Ext(fh.Filename), ".docx") {
+			writeError(w, errors.New("formato no soportado: sube un archivo .docx"))
+			return
+		}
+		extracted, err := notes.ExtractTextFromDocx(file, fh.Size)
+		if err != nil {
+			writeError(w, fmt.Errorf("no se pudo leer el documento .docx: %w", err))
+			return
+		}
+		if content != "" {
+			content += "\n\n"
+		}
+		content += extracted
+	}
+
+	num, _ := strconv.Atoi(r.FormValue("num_questions"))
+	questions, err := h.svc.GenerateQuiz(r.Context(), QuizAIParams{
+		Content:      content,
+		Difficulty:   r.FormValue("difficulty"),
+		NumQuestions: num,
+		Focus:        r.FormValue("focus"),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"questions": questions})
+}
+
+// aiImproveQuiz refines a not-yet-saved set of quiz questions according to a
+// free-text instruction (e.g. raise difficulty, level up, rephrase a question).
+func (h *Handler) aiImproveQuiz(w http.ResponseWriter, r *http.Request) {
+	if _, ok := authUser(w, r); !ok {
+		return
+	}
+	var req struct {
+		Questions   []QuizQuestion `json:"questions"`
+		Instruction string         `json:"instruction"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	questions, err := h.svc.ImproveQuiz(r.Context(), req.Questions, req.Instruction)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"questions": questions})
 }
 
 func (h *Handler) deleteResource(w http.ResponseWriter, r *http.Request) {
