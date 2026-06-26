@@ -1,4 +1,4 @@
-.PHONY: install run-backend run-frontend build-backend build-frontend test lint e2e
+.PHONY: install run-backend run-frontend build-backend build-frontend test test-integration lint e2e
 
 ## Install all dependencies
 install:
@@ -28,6 +28,20 @@ build-frontend:
 test:
 	go test -v -race ./...
 	cd frontend && npm run test
+
+## Run the Postgres integration tests in a throwaway container (one command).
+## Spins up a disposable Postgres on port 5433, runs the tagged tests against it,
+## and always tears it down afterwards (even if the tests fail). Requires Docker.
+test-integration:
+	@docker rm -f lp-test-db >/dev/null 2>&1 || true
+	@docker run -d --name lp-test-db -p 5433:5432 -e POSTGRES_PASSWORD=postgres postgres:17-alpine >/dev/null
+	@echo "Waiting for Postgres to be ready..."
+	@until docker exec lp-test-db pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+	@TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable" \
+		go test -tags integration -count=1 ./backend/internal/notes/; \
+		status=$$?; \
+		docker rm -f lp-test-db >/dev/null 2>&1; \
+		exit $$status
 
 ## Run linters
 lint:

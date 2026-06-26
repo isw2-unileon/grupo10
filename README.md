@@ -136,16 +136,24 @@ to validate the SQL against the actual schema. They are behind the `integration`
 build tag and skip themselves unless `TEST_DATABASE_URL` is set, so the regular
 `go test ./...` above stays database-free and never fails on a fresh clone.
 
-CI runs them automatically against a disposable Postgres service, so you don't
-need anything for pull requests.
+CI runs them automatically against a disposable Postgres service, so **you don't
+need to run these yourself for a normal workflow** — the regular `go test ./...`
+(or `make test`) is all day-to-day development requires.
 
-> ⚠️ **The tests `TRUNCATE` tables.** Point `TEST_DATABASE_URL` at a **throwaway**
-> Postgres, never at your dev database. Note that `docker compose up` already runs
-> the dev DB on port `5432`, so the test database must use a **different port**
-> (we use `5433` below) to avoid wiping your dev data.
+If you do want to run them locally, the easiest way is a single command that spins
+up a throwaway Postgres, runs the tests against it, and tears it down afterwards:
 
-To run them locally, spin up a disposable Postgres on its own port and point the
-variable at it:
+```bash
+make test-integration
+```
+
+> ⚠️ **The tests `TRUNCATE` tables.** They use a **disposable** Postgres on port
+> `5433`, isolated from the dev DB that `docker compose up` runs on `5432`, so they
+> never touch your dev data. The tests apply `backend/migrations/up.sql` themselves,
+> so the throwaway database needs no manual setup.
+
+<details>
+<summary>What <code>make test-integration</code> does under the hood</summary>
 
 ```bash
 # 1) Start a throwaway Postgres for tests only (port 5433, isolated from the dev DB)
@@ -159,9 +167,7 @@ go test -tags integration ./backend/internal/notes/
 # 3) Tear it down when you're done
 docker rm -f lp-test-db
 ```
-
-The tests apply `backend/migrations/up.sql` themselves, so the throwaway database
-needs no manual setup.
+</details>
 
 ## Running the frontend (dev)
 
