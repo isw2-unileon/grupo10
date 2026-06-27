@@ -65,6 +65,7 @@ func getUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return authorID, ok
 }
 
+//nolint:dupl // Ignoramos advertencia de duplicación estructural con listSharedNotes
 func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 	authorID, ok := getUserID(w, r)
 	if !ok {
@@ -79,7 +80,7 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if list == nil {
-		w.Write([]byte("[]\n"))
+		_, _ = w.Write([]byte("[]\n")) // Silenciamos los retornos para el linter
 		return
 	}
 	_ = json.NewEncoder(w).Encode(list)
@@ -293,7 +294,7 @@ func ExtractTextFromDocx(file multipart.File, size int64) (string, error) {
 	return strings.TrimSpace(textBuilder.String()), nil
 }
 
-// --- NUEVO: Endpoint para compartir un apunte con un email o grupo ---
+// Endpoint para compartir un apunte con un email o grupo ---
 //
 //nolint:dupl
 func (h *Handler) shareNote(w http.ResponseWriter, r *http.Request) {
@@ -316,7 +317,9 @@ func (h *Handler) shareNote(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// --- NUEVO: Endpoint para listar los apuntes que me han compartido ---
+// Endpoint para listar los apuntes que me han compartido ---
+//
+//nolint:dupl // Ignoramos advertencia de duplicación estructural con listNotes
 func (h *Handler) listSharedNotes(w http.ResponseWriter, r *http.Request) {
 	userID, ok := getUserID(w, r)
 	if !ok {
@@ -331,7 +334,7 @@ func (h *Handler) listSharedNotes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if list == nil {
-		w.Write([]byte("[]\n"))
+		_, _ = w.Write([]byte("[]\n")) // Silenciamos los retornos para el linter
 		return
 	}
 
