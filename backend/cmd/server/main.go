@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/isw2-unileon/grupo10/backend/internal/aitutor"
 	"github.com/isw2-unileon/grupo10/backend/internal/calendar"
 	"github.com/isw2-unileon/grupo10/backend/internal/groups"
 	"github.com/isw2-unileon/grupo10/backend/internal/notes"
@@ -58,11 +59,12 @@ func run() error {
 	// The JWT issuer is shared so every module validates tokens the same way.
 	issuer := users.NewJWTIssuer(jwtSecret(), tokenTTL)
 
-	// Registramos todos los módulos
+	// Registramos todos los módulos de la aplicación
 	registerUserRoutes(mux, db, issuer)
 	registerCalendarRoutes(mux, db)
 	registerGroupRoutes(mux, db, issuer)
-	registerNotesRoutes(mux, db, issuer) // <-- NUEVO: Registramos las rutas de notas pasándole el parser de JWT
+	registerNotesRoutes(mux, db, issuer)
+	registerAITutorRoutes(mux, db, issuer)
 
 	// 1. LEEMOS LA VARIABLE
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -72,7 +74,6 @@ func run() error {
 	}
 
 	// 2. ENVOLVER EL MUX CON EL MIDDLEWARE DE CORS
-	// Aplicamos el control de accesos cruzados pasándole la URL de tu frontend
 	handlerWithCORS := corsMiddleware(frontendURL)(mux)
 
 	srv := &http.Server{
@@ -114,12 +115,25 @@ func registerCalendarRoutes(mux *http.ServeMux, db *sql.DB) {
 	calendar.NewHandler(svc).RegisterRoutes(mux)
 }
 
-// NUEVO: Función para ensamblar el módulo de apuntes y protegerlo con JWT
 func registerNotesRoutes(mux *http.ServeMux, db *sql.DB, parser users.TokenParser) {
 	repo := notes.NewPostgresRepository(db)
 	svc := notes.NewService(repo)
-	// Pasamos el middleware RequireAuth para que todos los endpoints de notas estén protegidos
 	notes.NewHandler(svc).RegisterRoutes(mux, users.RequireAuth(parser))
+}
+
+// NUEVO: Función para ensamblar el módulo aislado de Inteligencia Artificial
+func registerAITutorRoutes(mux *http.ServeMux, db *sql.DB, parser users.TokenParser) {
+	// Comprobamos si existe el token de la IA en el entorno
+	aiKey := os.Getenv("AI_API_KEY")
+	if aiKey == "" {
+		log.Println("ℹ️  INFO: AI_API_KEY no encontrada. El Tutor IA funcionará en modo simulación offline.")
+	}
+
+	repo := aitutor.NewPostgresRepository(db)
+
+	// Nota: Si en el futuro actualizas aitutor.NewService para usar la API real, le pasarías 'aiKey' aquí.
+	svc := aitutor.NewService(repo)
+	aitutor.NewHandler(svc, parser).RegisterRoutes(mux)
 }
 
 func runMigrations(db *sql.DB) error {

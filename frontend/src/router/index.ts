@@ -91,6 +91,12 @@ const router = createRouter({
       name: 'student-profile',
       component: () => import('@/views/StudentProfileView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/student/ai-tutor',
+      name: 'student-ai-tutor',
+      component: () => import('@/views/AIQuizView.vue'),
+      meta: { requiresAuth: true }
     }
   ],
 })
