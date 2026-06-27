@@ -6,9 +6,14 @@
         <h2 style="margin: 0; color: #1e293b; font-size: 2rem;">🎓 Mis Asignaturas y Grupos</h2>
         <p style="margin: 5px 0 0 0; color: #64748b; font-size: 0.95rem;">Aquí puedes ver los grupos de clase a los que perteneces.</p>
       </div>
-      <button @click="$router.push('/student/profile')" style="background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: transform 0.2s;">
-        👤 Ver Mi Perfil y Notas
-      </button>
+      <div style="display: flex; gap: 10px;">
+        <button @click="$router.push('/student/ai-tutor')" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(99,102,241,0.2); transition: transform 0.2s;">
+          🤖 Tutor IA de Refuerzo
+        </button>
+        <button @click="$router.push('/student/profile')" style="background: #4f46e5; color: white; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); transition: transform 0.2s;">
+          👤 Ver Mi Perfil y Notas
+        </button>
+      </div>
     </div>
 
     <div v-if="grupos.length > 0">
@@ -34,7 +39,7 @@
 
     <div v-else style="margin-top: 40px; text-align: center; padding: 40px; border: 2px dashed #cbd5e1; border-radius: 12px; background: #f8fafc;">
       <div style="font-size: 3rem; margin-bottom: 15px;">⏳</div>
-      <h3 style="color: #334155;">Esperando a que te añadan a un grupo</h3>
+      <h3 style="color: #334155;">Esperando a que te añadan a un group</h3>
       <p style="color: #64748b; max-width: 500px; margin: 0 auto; line-height: 1.5;">
         Tu cuenta está activa, pero aún no apareces matriculado en ninguna asignatura. Dile a tu profesor que te añada utilizando tu correo electrónico.
       </p>
