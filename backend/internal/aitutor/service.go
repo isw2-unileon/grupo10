@@ -12,14 +12,20 @@ import (
 	"strings"
 )
 
+// groqEndpoint es el endpoint estándar de Groq (formato compatible con OpenAI).
+const groqEndpoint = "https://api.groq.com/openai/v1/chat/completions"
+
 // Service implementa la lógica de negocio.
 type Service struct {
 	repo Repository
+	// aiURL es el endpoint del modelo. Por defecto apunta a Groq; los tests lo
+	// sobreescriben con un servidor falso para no llamar a la IA real.
+	aiURL string
 }
 
 // NewService inicializa el servicio de IA.
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, aiURL: groqEndpoint}
 }
 
 // Estructuras de red internas para Groq (que usa el mismo formato que OpenAI)
@@ -110,10 +116,7 @@ La estructura estricta del JSON debe ser:
 		return nil, fmt.Errorf("error al empaquetar JSON: %w", err)
 	}
 
-	// Endpoint estándar de Groq
-	groqURL := "https://api.groq.com/openai/v1/chat/completions"
-
-	req, err := http.NewRequestWithContext(ctx, "POST", groqURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.aiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("error al crear petición HTTP: %w", err)
 	}
