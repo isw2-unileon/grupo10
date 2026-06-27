@@ -77,6 +77,11 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+
+	if list == nil {
+		w.Write([]byte("[]\n"))
+		return
+	}
 	_ = json.NewEncoder(w).Encode(list)
 }
 
@@ -322,5 +327,11 @@ func (h *Handler) listSharedNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+
+	if list == nil {
+		w.Write([]byte("[]\n"))
+		return
+	}
+
 	_ = json.NewEncoder(w).Encode(list)
 }
