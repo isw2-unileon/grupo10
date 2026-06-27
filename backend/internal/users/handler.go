@@ -3,7 +3,6 @@ package users
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 )
 
@@ -116,8 +115,7 @@ func writeError(w http.ResponseWriter, err error) {
 		// A valid token whose user no longer exists is treated as unauthenticated.
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "user no longer exists"})
 	default:
-		// 🎯 ¡CHIVATO ACTIVADO! Ahora sí veremos el error real en los logs de Render
-		log.Printf("🚨 [HTTP 500] ERROR INTERNO DETECTADO: %v", err)
+
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}
 }
