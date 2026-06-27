@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -15,7 +17,17 @@ type fakeRepo struct {
 	members   map[string][]Member  // groupID -> roster
 	sections  map[string]*Section  // sectionID -> section
 	resources map[string]*Resource // resourceID -> resource
-	seq       int
+
+	questions   map[string]*QuizQuestion // questionID -> question
+	options     map[string][]QuizOption  // questionID -> options
+	answers     map[string]string        // resourceID|studentID|questionID -> optionID
+	submissions map[string][]Submission  // resourceID -> submissions
+	analytics   map[string][]SubjectStat // studentID -> analytics
+
+	deletedSections  map[string]bool // sectionID -> deleted
+	deletedResources map[string]bool // resourceID -> deleted
+
+	seq int
 }
 
 func newFakeRepo() *fakeRepo {
@@ -25,6 +37,15 @@ func newFakeRepo() *fakeRepo {
 		members:   map[string][]Member{},
 		sections:  map[string]*Section{},
 		resources: map[string]*Resource{},
+
+		questions:   map[string]*QuizQuestion{},
+		options:     map[string][]QuizOption{},
+		answers:     map[string]string{},
+		submissions: map[string][]Submission{},
+		analytics:   map[string][]SubjectStat{},
+
+		deletedSections:  map[string]bool{},
+		deletedResources: map[string]bool{},
 	}
 }
 
@@ -121,8 +142,18 @@ func (f *fakeRepo) CreateSection(_ context.Context, sec *Section) error {
 	return nil
 }
 
-func (f *fakeRepo) UpdateSection(_ context.Context, sectionID, title string) error { return nil }
-func (f *fakeRepo) DeleteSection(_ context.Context, sectionID string) error        { return nil }
+func (f *fakeRepo) UpdateSection(_ context.Context, sectionID, title string) error {
+	if s, ok := f.sections[sectionID]; ok {
+		s.Title = title
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeleteSection(_ context.Context, sectionID string) error {
+	f.deletedSections[sectionID] = true
+	delete(f.sections, sectionID)
+	return nil
+}
 
 func (f *fakeRepo) GetSections(_ context.Context, groupID string) ([]Section, error) {
 	var out []Section
@@ -148,8 +179,18 @@ func (f *fakeRepo) CreateResource(_ context.Context, res *Resource) error {
 	return nil
 }
 
-func (f *fakeRepo) UpdateResource(_ context.Context, res *Resource) error     { return nil }
-func (f *fakeRepo) DeleteResource(_ context.Context, resourceID string) error { return nil }
+func (f *fakeRepo) UpdateResource(_ context.Context, res *Resource) error {
+	if _, ok := f.resources[res.ID]; ok {
+		f.resources[res.ID] = res
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeleteResource(_ context.Context, resourceID string) error {
+	f.deletedResources[resourceID] = true
+	delete(f.resources, resourceID)
+	return nil
+}
 func (f *fakeRepo) GetResourceByID(_ context.Context, resourceID string) (*Resource, error) {
 	r, ok := f.resources[resourceID]
 	if !ok {
@@ -168,33 +209,92 @@ func (f *fakeRepo) ListResourcesForSection(_ context.Context, sectionID string) 
 	return out, nil
 }
 
-// Stubs vacíos requeridos por la interfaz
-func (f *fakeRepo) CreateQuizQuestion(ctx context.Context, q *QuizQuestion) error { return nil }
-func (f *fakeRepo) CreateQuizOption(ctx context.Context, opt *QuizOption) error   { return nil }
-func (f *fakeRepo) GetQuizQuestions(ctx context.Context, resourceID string) ([]QuizQuestion, error) {
-	return nil, nil
-}
-func (f *fakeRepo) GetQuizOptions(ctx context.Context, questionID string) ([]QuizOption, error) {
-	return nil, nil
-}
-func (f *fakeRepo) SubmitAssignment(ctx context.Context, sub *Submission) error { return nil }
-func (f *fakeRepo) GradeSubmission(ctx context.Context, resourceID, studentID string, grade float64, feedback string) error {
+// In-memory implementations of the quiz / submission / analytics surface so the
+// service's scoring and grading logic can be exercised without a database.
+
+func (f *fakeRepo) CreateQuizQuestion(_ context.Context, q *QuizQuestion) error {
+	q.ID = f.id("question")
+	stored := *q
+	f.questions[q.ID] = &stored
 	return nil
 }
-func (f *fakeRepo) GetSubmissions(ctx context.Context, resourceID string) ([]Submission, error) {
-	return nil, nil
+
+func (f *fakeRepo) CreateQuizOption(_ context.Context, opt *QuizOption) error {
+	opt.ID = f.id("option")
+	f.options[opt.QuestionID] = append(f.options[opt.QuestionID], *opt)
+	return nil
 }
-func (f *fakeRepo) HasSubmitted(ctx context.Context, resourceID, studentID string) (bool, time.Time, *float64, error) {
+
+func (f *fakeRepo) GetQuizQuestions(_ context.Context, resourceID string) ([]QuizQuestion, error) {
+	var out []QuizQuestion
+	for _, q := range f.questions {
+		if q.ResourceID == resourceID {
+			out = append(out, *q)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Position < out[j].Position })
+	return out, nil
+}
+
+func (f *fakeRepo) GetQuizOptions(_ context.Context, questionID string) ([]QuizOption, error) {
+	return f.options[questionID], nil
+}
+
+func answerKey(resourceID, studentID, questionID string) string {
+	return resourceID + "|" + studentID + "|" + questionID
+}
+
+func (f *fakeRepo) SaveQuizAnswer(_ context.Context, resourceID, studentID, questionID, optionID string) error {
+	f.answers[answerKey(resourceID, studentID, questionID)] = optionID
+	return nil
+}
+
+func (f *fakeRepo) GetStudentAnswers(_ context.Context, resourceID, studentID string) (map[string]string, error) {
+	out := map[string]string{}
+	prefix := resourceID + "|" + studentID + "|"
+	for k, optID := range f.answers {
+		if strings.HasPrefix(k, prefix) {
+			out[strings.TrimPrefix(k, prefix)] = optID
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) SubmitAssignment(_ context.Context, sub *Submission) error {
+	sub.ID = f.id("submission")
+	sub.SubmittedAt = time.Now()
+	f.submissions[sub.ResourceID] = append(f.submissions[sub.ResourceID], *sub)
+	return nil
+}
+
+func (f *fakeRepo) GradeSubmission(_ context.Context, resourceID, studentID string, grade float64, feedback string) error {
+	subs := f.submissions[resourceID]
+	for i := range subs {
+		if subs[i].StudentID == studentID {
+			g := grade
+			subs[i].Grade = &g
+			subs[i].Feedback = feedback
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) GetSubmissions(_ context.Context, resourceID string) ([]Submission, error) {
+	return f.submissions[resourceID], nil
+}
+
+func (f *fakeRepo) HasSubmitted(_ context.Context, resourceID, studentID string) (bool, time.Time, *float64, error) {
+	subs := f.submissions[resourceID]
+	for i := len(subs) - 1; i >= 0; i-- {
+		if subs[i].StudentID == studentID {
+			return true, subs[i].SubmittedAt, subs[i].Grade, nil
+		}
+	}
 	return false, time.Time{}, nil, nil
 }
-func (f *fakeRepo) SaveQuizAnswer(ctx context.Context, resourceID, studentID, questionID, optionID string) error {
-	return nil
-}
-func (f *fakeRepo) GetStudentAnswers(ctx context.Context, resourceID, studentID string) (map[string]string, error) {
-	return nil, nil
-}
-func (f *fakeRepo) GetStudentAnalytics(ctx context.Context, studentID string) ([]SubjectStat, error) {
-	return nil, nil
+
+func (f *fakeRepo) GetStudentAnalytics(_ context.Context, studentID string) ([]SubjectStat, error) {
+	return f.analytics[studentID], nil
 }
 
 // ==========================================
