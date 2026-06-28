@@ -81,7 +81,7 @@ func (r *PostgresRepository) ListMembers(ctx context.Context, groupID string) ([
 		return nil, err
 	}
 	defer rows.Close()
-	var members []Member
+	members := []Member{}
 	for rows.Next() {
 		var m Member
 		if err := rows.Scan(&m.ID, &m.Email, &m.Registered, &m.AddedAt); err != nil {
@@ -137,7 +137,7 @@ func (r *PostgresRepository) GetSections(ctx context.Context, groupID string) ([
 		return nil, err
 	}
 	defer rows.Close()
-	var secs []Section
+	secs := []Section{}
 	for rows.Next() {
 		var s Section
 		_ = rows.Scan(&s.ID, &s.GroupID, &s.Title, &s.Position)
@@ -192,7 +192,7 @@ func (r *PostgresRepository) ListResourcesForSection(ctx context.Context, sectio
 		return nil, err
 	}
 	defer rows.Close()
-	var list []Resource
+	list := []Resource{}
 	for rows.Next() {
 		var res Resource
 		var due sql.NullTime
@@ -224,7 +224,7 @@ func (r *PostgresRepository) GetQuizQuestions(ctx context.Context, resourceID st
 		return nil, err
 	}
 	defer rows.Close()
-	var list []QuizQuestion
+	list := []QuizQuestion{}
 	for rows.Next() {
 		var q QuizQuestion
 		if err := rows.Scan(&q.ID, &q.ResourceID, &q.QuestionText, &q.Position); err == nil {
@@ -243,7 +243,7 @@ func (r *PostgresRepository) GetQuizOptions(ctx context.Context, questionID stri
 		return nil, err
 	}
 	defer rows.Close()
-	var list []QuizOption
+	list := []QuizOption{}
 	for rows.Next() {
 		var o QuizOption
 		if err := rows.Scan(&o.ID, &o.QuestionID, &o.OptionText, &o.IsCorrect); err == nil {
@@ -274,7 +274,7 @@ func (r *PostgresRepository) GetSubmissions(ctx context.Context, resourceID stri
 		return nil, err
 	}
 	defer rows.Close()
-	var list []Submission
+	list := []Submission{}
 	for rows.Next() {
 		var sub Submission
 		var g sql.NullFloat64
@@ -333,7 +333,7 @@ func (r *PostgresRepository) queryGroups(ctx context.Context, query string, args
 		return nil, err
 	}
 	defer rows.Close()
-	var gs []Group
+	gs := []Group{}
 	for rows.Next() {
 		var g Group
 		_ = rows.Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt)
@@ -404,7 +404,7 @@ func (r *PostgresRepository) GetStudentAnalytics(ctx context.Context, studentID 
 		}
 	}
 
-	var out []SubjectStat
+	out := []SubjectStat{}
 	for _, id := range orderedGroupIDs {
 		subStat := groupsMap[id]
 		var sum float64
