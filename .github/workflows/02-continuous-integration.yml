@@ -34,7 +34,7 @@ jobs:
       # The runner starts with an EMPTY workspace. This action clones your
       # repository so the following steps can access your code.
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # ── Step 2: Install Go ──────────────────────────────────────────────────
       # The runner has many tools pre-installed, but we pin the Go version
@@ -90,7 +90,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v6
