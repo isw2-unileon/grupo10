@@ -130,6 +130,8 @@ Or run everything via the `Makefile`:
 make test
 ```
 
+> **Windows users:** the `make` shortcuts rely on a Unix shell, so run them from **WSL** (or Git Bash). The plain `go test ./...` and `npm run test` commands above work in PowerShell/CMD as-is.
+
 ### Integration tests (Postgres)
 
 The repository layer has integration tests that run against a **real Postgres**
