@@ -14,8 +14,9 @@ Make sure you have the following installed before proceeding:
 |---|---|---|
 | Git | Any recent | [git-scm.com](https://git-scm.com/) |
 | Docker Desktop | Latest | [docker.com/get-started](https://www.docker.com/get-started/) |
-| Go | 1.23+ | [go.dev/dl](https://go.dev/dl/) *(only needed to run the server outside Docker)* |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) *(only needed to run the frontend outside Docker)* |
+| Go | 1.25+ | [go.dev/dl](https://go.dev/dl/) *(only needed to run the server or tests outside Docker)* |
+| Node.js | 20+ | [nodejs.org](https://nodejs.org/) *(only needed to run the frontend outside Docker)* |
+| Make | Any recent | Pre-installed on macOS/Linux; on Windows use WSL or `choco install make` *(only needed for the `make` shortcuts below)* |
 
 > **Windows users:** Docker Desktop already includes Docker Compose. Make sure Docker Desktop is running before executing any `docker` command.
 
@@ -128,6 +129,8 @@ Or run everything via the `Makefile`:
 ```bash
 make test
 ```
+
+> **Windows users:** the `make` shortcuts rely on a Unix shell, so run them from **WSL** (or Git Bash). The plain `go test ./...` and `npm run test` commands above work in PowerShell/CMD as-is.
 
 ### Integration tests (Postgres)
 
