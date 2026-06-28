@@ -56,9 +56,14 @@ DB_PASSWORD=password
 DB_NAME=learning_platform
 DB_PORT_HOST=5432
 SERVER_PORT_HOST=8080
+
+# AI features (Groq). Get a free key at https://console.groq.com/keys
+GROQ_API_KEY=
 ```
 
 > The default values work out of the box for local development. Only change them if you have port conflicts.
+
+> **AI features need a Groq key.** The AI-powered features (notes AI review, AI quiz generation, AI tutor) call [Groq](https://console.groq.com/keys) and require a valid `GROQ_API_KEY`. If it's left empty, the rest of the app works normally but those features return an error. Get a free key at [console.groq.com/keys](https://console.groq.com/keys) and paste it into your `.env`.
 
 ### 3. Start the stack
 
@@ -143,8 +148,13 @@ CI runs them automatically against a disposable Postgres service, so **you don't
 need to run these yourself for a normal workflow** — the regular `go test ./...`
 (or `make test`) is all day-to-day development requires.
 
-If you do want to run them locally, the easiest way is a single command that spins
-up a throwaway Postgres, runs the tests against it, and tears it down afterwards:
+`TEST_DATABASE_URL` is the connection string that tells the tests which Postgres
+to use. **It is NOT part of your `.env` file** — it's a variable you set only for
+the test command (the app and `docker compose` never read it).
+
+**Option A — one command (recommended).** `make test-integration` starts a
+throwaway Postgres, sets `TEST_DATABASE_URL` for you, runs the tests and tears the
+container down afterwards. You don't set anything by hand:
 
 ```bash
 make test-integration
@@ -153,24 +163,27 @@ make test-integration
 > ⚠️ **The tests `TRUNCATE` tables.** They use a **disposable** Postgres on port
 > `5433`, isolated from the dev DB that `docker compose up` runs on `5432`, so they
 > never touch your dev data. The tests apply `backend/migrations/up.sql` themselves,
-> so the throwaway database needs no manual setup.
+> so the database needs no manual setup.
 
-<details>
-<summary>What <code>make test-integration</code> does under the hood</summary>
+**Option B — run them by hand.** Start any Postgres, then **export** the variable in
+your shell (or prefix it before the command) pointing at that database, and run the
+tagged tests:
 
 ```bash
 # 1) Start a throwaway Postgres for tests only (port 5433, isolated from the dev DB)
 docker run -d --name lp-test-db -p 5433:5432 \
   -e POSTGRES_PASSWORD=postgres postgres:17-alpine
 
-# 2) Run the integration tests against it
+# 2) Point the tests at it via TEST_DATABASE_URL and run them
 export TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable"
 go test -tags integration ./backend/internal/notes/
 
 # 3) Tear it down when you're done
 docker rm -f lp-test-db
 ```
-</details>
+
+> The format is `postgres://USER:PASSWORD@HOST:PORT/DBNAME?sslmode=disable`.
+> If `TEST_DATABASE_URL` is unset, the integration tests simply skip — they never fail a plain `go test ./...`.
 
 ## Running the frontend (dev)
 
@@ -184,50 +197,3 @@ npm run dev   # http://localhost:5173
 ```
 
 Requests to `/api/*` are proxied to the backend at `http://localhost:8080`.
-
----
-
-## Contributing
-
-This project follows [Trunk Based Development](https://trunkbaseddevelopment.com/). Please read the following before opening a Pull Request.
-
-**Branch naming**
-
-Branches must be short-lived and named after the task they address:
-
-```
-feat/user-authentication
-fix/note-status-transition
-chore/update-dependencies
-```
-
-**Commit messages**
-
-Write commits in English using the [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-```
-feat: add AI feedback endpoint for notes
-fix: correct foreign key constraint on enrollments
-chore: upgrade Go to 1.23.1
-```
-
-**Pull Requests**
-
-- Every PR must be reviewed by at least one other team member before merging.
-- Link the PR to its corresponding GitHub Projects task.
-- Keep PRs small and focused — one task per PR.
-- Delete the branch after merging.
-
-**Everything in English:** code, comments, branch names, commit messages, PR descriptions, and GitHub Projects tasks.
-
----
-
-## Technical documentation
-
-Full architecture notes, data model and design decisions are available in [`/docs`](/docs).
-
----
-
-## Contact
-
-For questions about the assignment: [jferrl@unileon.es](mailto:jferrl@unileon.es)
