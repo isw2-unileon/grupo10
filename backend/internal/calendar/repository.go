@@ -44,7 +44,7 @@ func (r *PostgresRepository) GetAvailableTutorings() ([]Event, error) {
 	}
 	defer rows.Close()
 
-	var events []Event
+	events := []Event{}
 	for rows.Next() {
 		var e Event
 
