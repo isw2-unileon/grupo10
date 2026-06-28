@@ -95,6 +95,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -120,7 +121,7 @@ function getHeaders(isMultipart = false) {
 const cargarMateriales = async () => {
   try {
     loading.value = true
-    const res = await fetch(`/api/groups/${grupoId}/content`, { headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/groups/${grupoId}/content`, { headers: getHeaders() })
     if (res.ok) secciones.value = await res.json() || []
   } catch (e) { console.error(e) }
   finally { loading.value = false }
@@ -142,7 +143,7 @@ const subirEntregaEstudiante = async (resId) => {
     fd.append("text_content", txt)
     if (file) fd.append("file", file)
 
-    const res = await fetch(`/api/resources/${resId}/submit`, {
+    const res = await fetch(`${API_BASE}/api/resources/${resId}/submit`, {
       method: 'POST',
       headers: getHeaders(true),
       body: fd
@@ -160,7 +161,7 @@ const subirEntregaEstudiante = async (resId) => {
 // Descarga inteligente de blobs (Autorizado mediante JWT)
 const descargarArchivoSeguro = async (filePath, title) => {
   try {
-    const res = await fetch(`/api/uploads/${filePath}`, {
+    const res = await fetch(`${API_BASE}/api/uploads/${filePath}`, {
       headers: { 'Authorization': `Bearer ${auth.token}` }
     })
     if (!res.ok) throw new Error("Fallo en la descarga")

@@ -302,6 +302,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -361,13 +362,13 @@ function getHeaders(isMultipart = false) {
 const cargarLmsCompleto = async () => {
   try {
     loading.value = true
-    const resG = await fetch(`/api/groups/${grupoId}`, { headers: getHeaders() })
+    const resG = await fetch(`${API_BASE}/api/groups/${grupoId}`, { headers: getHeaders() })
     if (resG.ok) {
       const d = await resG.json()
       grupo.value = d
       miembros.value = d.members || []
     }
-    const resC = await fetch(`/api/groups/${grupoId}/content`, { headers: getHeaders() })
+    const resC = await fetch(`${API_BASE}/api/groups/${grupoId}/content`, { headers: getHeaders() })
     if (resC.ok) secciones.value = await resC.json() || []
   } catch (e) { console.error(e) }
   finally { loading.value = false }
@@ -376,7 +377,7 @@ const cargarLmsCompleto = async () => {
 const matricularAlumno = async () => {
   if (!nuevoEmail.value.trim()) return
   try {
-    const res = await fetch(`/api/groups/${grupoId}/members`, {
+    const res = await fetch(`${API_BASE}/api/groups/${grupoId}/members`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ emails: [nuevoEmail.value.trim()] })
@@ -393,7 +394,7 @@ const matricularAlumno = async () => {
 const expulsarAlumno = async (memberId) => {
   if (!confirm("¿Seguro que quieres desmatricular a este alumno de la asignatura?")) return
   try {
-    const res = await fetch(`/api/groups/${grupoId}/members/${memberId}`, {
+    const res = await fetch(`${API_BASE}/api/groups/${grupoId}/members/${memberId}`, {
       method: 'DELETE',
       headers: getHeaders()
     })
@@ -407,7 +408,7 @@ const expulsarAlumno = async (memberId) => {
 const crearNuevaSeccion = async () => {
   if (!nuevoTemaTitulo.value.trim()) return
   try {
-    const res = await fetch(`/api/groups/${grupoId}/sections`, {
+    const res = await fetch(`${API_BASE}/api/groups/${grupoId}/sections`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ title: nuevoTemaTitulo.value.trim(), position: secciones.value.length })
@@ -422,7 +423,7 @@ const crearNuevaSeccion = async () => {
 const eliminarSeccionCompleta = async (sectionId) => {
   if (!confirm("¿Estás seguro? Se borrará el tema y todos los archivos y cuestionarios de su interior.")) return
   try {
-    const res = await fetch(`/api/sections/${sectionId}`, { method: 'DELETE', headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/sections/${sectionId}`, { method: 'DELETE', headers: getHeaders() })
     if (res.ok) cargarLmsCompleto()
   } catch (e) { console.error(e) }
 }
@@ -431,7 +432,7 @@ const editarSeccion = async (sec) => {
   const nuevoTitulo = prompt("Modificar título del tema:", sec.title)
   if (!nuevoTitulo || nuevoTitulo === sec.title) return
   try {
-    const res = await fetch(`/api/sections/${sec.id}`, {
+    const res = await fetch(`${API_BASE}/api/sections/${sec.id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({ title: nuevoTitulo })
@@ -452,7 +453,7 @@ const editarRecurso = async (res) => {
   }
 
   try {
-    const fetchRes = await fetch(`/api/resources/${res.id}`, {
+    const fetchRes = await fetch(`${API_BASE}/api/resources/${res.id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({ title: nuevoTitulo, content: nuevaDesc, due_at })
@@ -509,7 +510,7 @@ const generarTestConIA = async () => {
     fd.append('num_questions', String(iaQuiz.value.numPreguntas))
     fd.append('focus', iaQuiz.value.enfoque)
 
-    const res = await fetch('/api/quizzes/ai-generate', {
+    const res = await fetch(`${API_BASE}/api/quizzes/ai-generate`, {
       method: 'POST',
       headers: getHeaders(true),
       body: fd
@@ -533,7 +534,7 @@ const mejorarTestConIA = async () => {
   }
   iaQuiz.value.mejorando = true
   try {
-    const res = await fetch('/api/quizzes/ai-improve', {
+    const res = await fetch(`${API_BASE}/api/quizzes/ai-improve`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -556,7 +557,7 @@ const guardarContenidoEnServidor = async (secId) => {
 
   try {
     if (nuevoRecurso.value.type === 'quiz') {
-      const res = await fetch(`/api/sections/${secId}/quizzes`, {
+      const res = await fetch(`${API_BASE}/api/sections/${secId}/quizzes`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ title: nuevoRecurso.value.title, questions: nuevoRecurso.value.questions })
@@ -573,7 +574,7 @@ const guardarContenidoEnServidor = async (secId) => {
       if (nuevoRecurso.value.due_at) fd.append("due_at", new Date(nuevoRecurso.value.due_at).toISOString())
       if (nuevoRecurso.value.fileObj) fd.append("file", nuevoRecurso.value.fileObj)
 
-      const res = await fetch(`/api/sections/${secId}/resources`, {
+      const res = await fetch(`${API_BASE}/api/sections/${secId}/resources`, {
         method: 'POST',
         headers: getHeaders(true),
         body: fd
@@ -589,7 +590,7 @@ const guardarContenidoEnServidor = async (secId) => {
 const eliminarRecursoServidor = async (resId) => {
   if (!confirm("¿Borrar este elemento de la asignatura?")) return
   try {
-    const res = await fetch(`/api/resources/${resId}`, { method: 'DELETE', headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/resources/${resId}`, { method: 'DELETE', headers: getHeaders() })
     if (res.ok) cargarLmsCompleto()
   } catch (e) { console.error(e) }
 }
@@ -600,7 +601,7 @@ const revisarEntregasAlumnos = async (resId) => {
     return
   }
   try {
-    const res = await fetch(`/api/resources/${resId}/submissions`, { headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/resources/${resId}/submissions`, { headers: getHeaders() })
     if (res.ok) {
       entregasAlumnos.value = await res.json() || []
       revisandoRecursoId.value = resId
@@ -618,7 +619,7 @@ const enviarCalificacion = async (resId, studentId) => {
   if (nota === undefined || nota === "") return alert("Pon una nota válida.")
 
   try {
-    const res = await fetch(`/api/resources/${resId}/submissions/${studentId}/grade`, {
+    const res = await fetch(`${API_BASE}/api/resources/${resId}/submissions/${studentId}/grade`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ grade: String(nota), feedback })
@@ -638,7 +639,7 @@ const verExamenDetalladoAlumno = async (resourceId, studentId) => {
     return
   }
   try {
-    const res = await fetch(`/api/resources/${resourceId}/review/${studentId}`, { headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/resources/${resourceId}/review/${studentId}`, { headers: getHeaders() })
     if (res.ok) {
       examenInspeccionado.value = await res.json()
       examenInspeccionadoStudentId.value = studentId
@@ -648,7 +649,7 @@ const verExamenDetalladoAlumno = async (resourceId, studentId) => {
 
 const descargarArchivoSeguro = async (filePath, title) => {
   try {
-    const res = await fetch(`/api/uploads/${filePath}`, {
+    const res = await fetch(`${API_BASE}/api/uploads/${filePath}`, {
       headers: { 'Authorization': `Bearer ${auth.token}` }
     })
     if (!res.ok) throw new Error("Fallo en la descarga")
@@ -673,7 +674,7 @@ const verEstadisticasAlumno = async (studentId) => {
     return
   }
   try {
-    const res = await fetch(`/api/groups/${grupoId}/students/${studentId}/stats`, { headers: getHeaders() })
+    const res = await fetch(`${API_BASE}/api/groups/${grupoId}/students/${studentId}/stats`, { headers: getHeaders() })
     if (res.ok) {
       const data = await res.json()
       

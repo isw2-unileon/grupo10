@@ -48,6 +48,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth' 
 import { useRouter } from 'vue-router'
@@ -62,7 +63,7 @@ const nuevoGrupo = ref('')
 // Función para pedirle a Go los grupos de este profesor
 const cargarGrupos = async () => {
   try {
-    const res = await fetch('/api/groups', {
+    const res = await fetch(`${API_BASE}/api/groups`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +92,7 @@ const crearGrupo = async () => {
   }
 
   try {
-    const res = await fetch('/api/groups', {
+    const res = await fetch(`${API_BASE}/api/groups`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
