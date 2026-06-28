@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -32,7 +33,7 @@ const handleRangeSelect = async (info: any) => {
   }
 
   try {
-    const response = await fetch('/api/tutorings', {
+    const response = await fetch(`${API_BASE}/api/tutorings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newEvent)
@@ -68,7 +69,7 @@ const handleEventClick = async (info: any) => {
   }
 
   try {
-    const response = await fetch('/api/tutorings/book', {
+    const response = await fetch(`${API_BASE}/api/tutorings/book`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bookingData)
@@ -88,7 +89,7 @@ const handleEventClick = async (info: any) => {
 
 const fetchEventsFromDB = async () => {
   try {
-    const response = await fetch('/api/tutorings') 
+    const response = await fetch(`${API_BASE}/api/tutorings`) 
     if (!response.ok) throw new Error('Fallo al conectar con Go')
 
     const eventsData = await response.json()

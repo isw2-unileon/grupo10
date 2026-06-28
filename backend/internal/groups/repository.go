@@ -23,7 +23,10 @@ const selectGroup = `SELECT id, name, owner_id, created_at FROM class_groups`
 
 // AccountByID busca un usuario.
 func (r *PostgresRepository) AccountByID(ctx context.Context, id string) (*Account, error) {
-	const q = `SELECT u.id, r.name, u.email FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1`
+	// Cast a ::text en ambos lados del JOIN: en Render role_id (users) y roles.id
+	// pueden tener tipos distintos (UUID vs VARCHAR) y el JOIN directo da 500.
+	// Mismo arreglo que en users/repository.go.
+	const q = `SELECT u.id, r.name, u.email FROM users u JOIN roles r ON r.id::text = u.role_id::text WHERE u.id = $1`
 	var acc Account
 	err := r.db.QueryRowContext(ctx, q, id).Scan(&acc.ID, &acc.Role, &acc.Email)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {

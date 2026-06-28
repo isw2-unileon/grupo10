@@ -176,6 +176,11 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 CREATE INDEX IF NOT EXISTS idx_calendar_owner     ON calendar_events(owner_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_starts_at ON calendar_events(starts_at);
 
+-- Evolve pre-existing production tables: calendar_events was created before
+-- `description` existed, and CREATE TABLE IF NOT EXISTS does not add columns to
+-- an already-existing table. Same idempotent pattern as the notes ALTERs above.
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS description TEXT;
+
 
 -- Tutoring Bookings (student reserves a tutoring slot)
 CREATE TABLE IF NOT EXISTS tutoring_bookings (

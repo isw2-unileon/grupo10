@@ -55,6 +55,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -78,7 +79,7 @@ const evaluarEntornoQuiz = async () => {
     loading.value = true
     
     // 1. Averiguar primero en el árbol general si el alumno ya lo había enviado previamente
-    const resContent = await fetch(`/api/groups/${route.params.groupId}/content`, { headers: getHeaders() })
+    const resContent = await fetch(`${API_BASE}/api/groups/${route.params.groupId}/content`, { headers: getHeaders() })
     if (resContent.ok) {
       const secciones = await resContent.json() || []
       // Buscamos si este recurso ya figura como entregado (has_submitted)
@@ -93,11 +94,11 @@ const evaluarEntornoQuiz = async () => {
     // 2. Cargar el cuestionario según el modo detectado
     if (modoRevision.value) {
       // Si está en revisión, llamamos al nuevo endpoint relacional pasándole la ID del alumno logueado
-      const res = await fetch(`/api/resources/${resourceId}/review/${auth.user.id}`, { headers: getHeaders() })
+      const res = await fetch(`${API_BASE}/api/resources/${resourceId}/review/${auth.user.id}`, { headers: getHeaders() })
       if (res.ok) quiz.value = await res.json()
     } else {
       // Si va a responder por primera vez, cargamos el esqueleto del quiz normal
-      const res = await fetch(`/api/resources/${resourceId}/quiz`, { headers: getHeaders() })
+      const res = await fetch(`${API_BASE}/api/resources/${resourceId}/quiz`, { headers: getHeaders() })
       if (res.ok) quiz.value = await res.json()
     }
   } catch (e) { console.error(e) }
@@ -112,7 +113,7 @@ const enviarCuestionario = async () => {
   
   try {
     loading.value = true
-    const res = await fetch(`/api/resources/${resourceId}/submit-quiz`, {
+    const res = await fetch(`${API_BASE}/api/resources/${resourceId}/submit-quiz`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth.token}` },
       body: JSON.stringify({ answers: respuestas.value })
@@ -125,7 +126,7 @@ const enviarCuestionario = async () => {
       
       // Forzamos el cambio automático a modo revisión para que vea la corrección al segundo
       modoRevision.value = true
-      const resRev = await fetch(`/api/resources/${resourceId}/review/${auth.user.id}`, { headers: getHeaders() })
+      const resRev = await fetch(`${API_BASE}/api/resources/${resourceId}/review/${auth.user.id}`, { headers: getHeaders() })
       if (resRev.ok) quiz.value = await resRev.json()
     }
   } catch (e) { console.error(e) }

@@ -48,6 +48,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -59,7 +60,7 @@ const groups = ref([])
 // Fetch student groups from Go backend
 const loadMyGroups = async () => {
   try {
-    const res = await fetch('/api/me/groups', {
+    const res = await fetch(`${API_BASE}/api/me/groups`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
