@@ -80,6 +80,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -101,12 +102,12 @@ const notaFinal = ref(0)
 const cargarEcosistemaEstudiante = async () => {
   try {
     loadingInit.value = true
-    const res = await fetch('/api/me/groups', { headers: { 'Authorization': `Bearer ${auth.token}` } })
+    const res = await fetch(`${API_BASE}/api/me/groups`, { headers: { 'Authorization': `Bearer ${auth.token}` } })
     if (res.ok) {
       asignaturas.value = await res.json()
       // Ejecutamos en paralelo la descarga de todos los temas de todas tus asignaturas juntas
       await Promise.all(asignaturas.value.map(async (g) => {
-        const resT = await fetch(`/api/groups/${g.id}/content`, { headers: { 'Authorization': `Bearer ${auth.token}` } })
+        const resT = await fetch(`${API_BASE}/api/groups/${g.id}/content`, { headers: { 'Authorization': `Bearer ${auth.token}` } })
         if (resT.ok) {
           temasPorAsignatura.value[g.id] = await resT.json() || []
         }
@@ -127,7 +128,7 @@ const solicitarCuestionarioIA = async () => {
   try {
     // Inyectamos la lista de identificadores separados por comas
     const queryIds = selectedThemes.value.join(',')
-    const res = await fetch(`/api/ai-quiz?sections=${queryIds}`, { headers: { 'Authorization': `Bearer ${auth.token}` } })
+    const res = await fetch(`${API_BASE}/api/ai-quiz?sections=${queryIds}`, { headers: { 'Authorization': `Bearer ${auth.token}` } })
     if (res.ok) cuestionario.value = await res.json()
   } catch (e) { console.error(e) }
   finally { generando.value = false }

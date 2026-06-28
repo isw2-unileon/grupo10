@@ -59,6 +59,7 @@
 </template>
 
 <script setup>
+import { API_BASE } from '@/services/apiBase'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -74,7 +75,7 @@ const obtenerNombre = (email) => {
 
 const cargarPerfil = async () => {
   try {
-    const res = await fetch('/api/me/profile', {
+    const res = await fetch(`${API_BASE}/api/me/profile`, {
       headers: { 'Authorization': `Bearer ${auth.token}` }
     })
     if (res.ok) perfil.value = await res.json()
