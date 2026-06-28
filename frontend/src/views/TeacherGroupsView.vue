@@ -7,13 +7,13 @@
       <h3>Crear Nuevo Grupo</h3>
       <div style="display: flex; gap: 10px;">
         <input 
-          v-model="nuevoGrupo" 
+          v-model="newGroupName" 
           type="text" 
           placeholder="Ej: Ingeniería del Software II"
           style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"
         />
         <button 
-          @click="crearGrupo"
+          @click="createGroup"
           style="padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;"
         >
           Crear
@@ -24,15 +24,15 @@
     <div>
       <h3>Mis Grupos Actuales</h3>
       
-      <ul v-if="grupos.length > 0" style="list-style: none; padding: 0;">
+      <ul v-if="groups.length > 0" style="list-style: none; padding: 0;">
         <li 
-          v-for="grupo in grupos" 
-          :key="grupo.id"
+          v-for="group in groups" 
+          :key="group.id"
           style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;"
         >
-          <strong>{{ grupo.name }}</strong>
+          <strong>{{ group.name }}</strong>
           <button 
-            @click="verDetalles(grupo.id)"
+            @click="viewDetails(group.id)"
             style="padding: 6px 12px; background-color: #008CBA; color: white; border: none; border-radius: 4px; cursor: pointer;"
           >
             Gestionar Alumnos 👥
@@ -52,27 +52,27 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth' 
 import { useRouter } from 'vue-router'
 const router = useRouter()
-// Inicializamos la tienda de autenticación
+// Initialize auth store
 const auth = useAuthStore()
 
-// Variables reactivas
-const grupos = ref([])
-const nuevoGrupo = ref('')
+// Reactive variables
+const groups = ref([])
+const newGroupName = ref('')
 
-// Función para pedirle a Go los grupos de este profesor
-const cargarGrupos = async () => {
+// Function to fetch the teacher's groups from Go
+const loadGroups = async () => {
   try {
     const res = await fetch('/api/groups', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        // 🔑 AQUÍ LE PASAMOS EL TOKEN A GO
+        // 🔑 HERE WE PASS THE TOKEN TO GO
         'Authorization': `Bearer ${auth.token}` 
       }
     })
     
     if (res.ok) {
-      grupos.value = await res.json()
+      groups.value = await res.json()
     } else if (res.status === 401) {
       alert("Sesión expirada o no autorizado. ¡Prueba a loguearte otra vez como profe! 👨‍🏫")
     } else {
@@ -83,9 +83,9 @@ const cargarGrupos = async () => {
   }
 }
 
-// Función para mandar el nuevo grupo a Go
-const crearGrupo = async () => {
-  if (!nuevoGrupo.value.trim()) {
+// Function to send the new group to Go
+const createGroup = async () => {
+  if (!newGroupName.value.trim()) {
     alert("¡Escribe un nombre para el grupo primero! 🛑")
     return
   }
@@ -95,16 +95,16 @@ const crearGrupo = async () => {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        // 🔑 AQUÍ TAMBIÉN LE PASAMOS EL TOKEN A GO
+        // 🔑 HERE WE ALSO PASS THE TOKEN TO GO
         'Authorization': `Bearer ${auth.token}`
       },
-      body: JSON.stringify({ name: nuevoGrupo.value })
+      body: JSON.stringify({ name: newGroupName.value })
     })
 
     if (res.ok) {
       alert("¡Grupo creado con éxito! 🎉")
-      nuevoGrupo.value = '' // Vaciamos el input
-      cargarGrupos()        // Recargamos la lista para que aparezca el nuevo
+      newGroupName.value = '' // Clear the input
+      loadGroups()          // Reload the list to show the new one
     } else {
       const errorData = await res.json().catch(() => ({}))
       alert("Error al crear: " + (errorData.error || "Fallo en el servidor"))
@@ -114,14 +114,14 @@ const crearGrupo = async () => {
   }
 }
 
-// Función preparatoria para la siguiente fase
-const verDetalles = (id) => {
+// Preparatory function for the next phase
+const viewDetails = (id) => {
     router.push(`/teacher/groups/${id}`)
   
 }
 
-// Cuando la pantalla nace, cargamos los grupos automáticamente
+// Load groups automatically when the component mounts
 onMounted(() => {
-  cargarGrupos()
+  loadGroups()
 })
 </script>

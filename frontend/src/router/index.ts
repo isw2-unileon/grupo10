@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import { useAuthStore } from '@/stores/auth'
 import CalendarView from '@/views/CalendarView.vue'
+
 // Per-route auth metadata, consumed by the navigation guard below.
 declare module 'vue-router' {
   interface RouteMeta {
@@ -102,11 +103,6 @@ const router = createRouter({
 })
 
 // Global navigation guard.
-//
-// 1. If a token survived in localStorage but the user object is not loaded yet
-//    (typical after a page reload), rehydrate the account from /api/me once.
-// 2. Block protected routes for guests and bounce guest-only routes (login,
-//    register) for users who are already signed in.
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
@@ -114,14 +110,20 @@ router.beforeEach(async (to) => {
     await auth.fetchMe()
   }
 
+  // 1. Proteger rutas que requieren autenticación
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
+  // 2. Redirección inteligente: Si ya está logueado e intenta ir a la página de inicio (/) 
+  // o a las de login/registro (guestOnly), lo mandamos directamente a su panel (Home).
+  if (auth.isAuthenticated && (to.name === 'home' || to.meta.guestOnly)) {
+    if (auth.user?.role === 'student') {
+      return { name: 'student-home' }
+    } else if (auth.user?.role === 'teacher') {
+      return { name: 'teacher-home' }
+    }
   }
 })
 
 export default router
-// Prueba de despliegue Render

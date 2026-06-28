@@ -16,19 +16,19 @@
       </div>
     </div>
 
-    <div v-if="grupos.length > 0">
+    <div v-if="groups.length > 0">
       <ul style="list-style: none; padding: 0;">
         <li 
-          v-for="grupo in grupos" 
-          :key="grupo.id"
+          v-for="group in groups" 
+          :key="group.id"
           style="border: 1px solid #cbd5e1; padding: 20px; border-radius: 8px; margin-bottom: 15px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;"
         >
           <div>
-            <h3 style="margin: 0 0 5px 0; color: #0f172a;">{{ grupo.name }}</h3>
-            <span style="font-size: 0.85rem; color: #64748b;">ID del Grupo: {{ grupo.id }}</span>
+            <h3 style="margin: 0 0 5px 0; color: #0f172a;">{{ group.name }}</h3>
+            <span style="font-size: 0.85rem; color: #64748b;">ID del Grupo: {{ group.id }}</span>
           </div>
           <button 
-            @click="verTareasGrupo(grupo.id)"
+            @click="viewGroupTasks(group.id)"
             style="padding: 10px 18px; background-color: #d97706; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95rem;"
           >
             Entrar al Campus 📝
@@ -39,7 +39,7 @@
 
     <div v-else style="margin-top: 40px; text-align: center; padding: 40px; border: 2px dashed #cbd5e1; border-radius: 12px; background: #f8fafc;">
       <div style="font-size: 3rem; margin-bottom: 15px;">⏳</div>
-      <h3 style="color: #334155;">Esperando a que te añadan a un group</h3>
+      <h3 style="color: #334155;">Esperando a que te añadan a un grupo</h3>
       <p style="color: #64748b; max-width: 500px; margin: 0 auto; line-height: 1.5;">
         Tu cuenta está activa, pero aún no apareces matriculado en ninguna asignatura. Dile a tu profesor que te añada utilizando tu correo electrónico.
       </p>
@@ -54,34 +54,34 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const auth = useAuthStore()
-const grupos = ref([])
+const groups = ref([])
 
-// Función para pedirle a Go los grupos del alumno logueado
-const cargarMisGrupos = async () => {
+// Fetch student groups from Go backend
+const loadMyGroups = async () => {
   try {
     const res = await fetch('/api/me/groups', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${auth.token}` // Pasamos el token del alumno
+        'Authorization': `Bearer ${auth.token}` 
       }
     })
 
     if (res.ok) {
-      grupos.value = await res.json()
+      groups.value = await res.json()
     } else {
-      console.error("Error al obtener los grupos del alumno")
+      console.error("Error fetching student groups")
     }
   } catch (error) {
-    console.error("Error de conexión:", error)
+    console.error("Connection error:", error)
   }
 }
 
-const verTareasGrupo = (id) => {
+const viewGroupTasks = (id) => {
   router.push(`/student/groups/${id}/tasks`)
 }
 
 onMounted(() => {
-  cargarMisGrupos()
+  loadMyGroups()
 })
 </script>

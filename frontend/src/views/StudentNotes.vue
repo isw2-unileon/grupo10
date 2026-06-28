@@ -327,7 +327,7 @@ function formatStatus(status: string) {
 
     <main v-else-if="currentView === 'detail' && selectedNote" class="view-detail">
       <div class="detail-navigation">
-        <button @click="viewingShared ? switchView('shared') : switchView('list')" class="btn-back">⬅️ Volver atrás</button>
+        <button @click="viewingShared ? switchView('shared') : switchView('list')" class="btn-back" style="color: black;">⬅️ Volver atrás</button>
         <span v-if="!viewingShared" class="badge status-indicator" :class="selectedNote.status">{{ formatStatus(selectedNote.status) }}</span>
         <span v-else class="badge shared-badge status-indicator">🤝 Apunte de la Comunidad</span>
       </div>
@@ -340,7 +340,7 @@ function formatStatus(status: string) {
             <div class="notebook-top-buttons" v-if="!viewingShared">
               <button @click="openShareDialog(selectedNote.id)" class="btn-note-share">🔗 Compartir</button>
 
-              <button v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'" @click="openEditFromDetail" class="btn-note-edit">✏️ Modificar</button>
+              <button v-if="selectedNote.status !== 'pending' && selectedNote.status !== 'approved'" @click="openEditFromDetail" class="btn-note-edit" style="color: black;">✏️ Modificar</button>
               
               <button @click="requestAIReview(selectedNote.id)" :disabled="actionLoading" class="btn-note-ai">
                 {{ actionLoading ? '🤖 Pensando...' : '🤖 Consultar IA' }}
@@ -381,7 +381,7 @@ function formatStatus(status: string) {
           <textarea v-model="editContent" rows="15" placeholder="Escribe aquí..."></textarea>
         </div>
         <div class="form-actions">
-          <button @click="editNoteId ? currentView = 'detail' : currentView = 'list'" class="btn-cancel">Cancelar</button>
+          <button @click="editNoteId ? currentView = 'detail' : currentView = 'list'" class="btn-cancel" style="color: black;">Cancelar</button>
           <button @click="saveManualNote" class="btn-save">💾 Guardar</button>
         </div>
       </div>
