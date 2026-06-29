@@ -19,11 +19,11 @@
   "dependencies": {
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
-    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.21",
     "@fullcalendar/timegrid": "^6.1.21",
-    "@fullcalendar/vue3": "^6.1.20",
+    "@fullcalendar/vue3": "^6.1.21",
     "pinia": "^2.1.7",
-    "vue": "^3.4.27",
+    "vue": "^3.5.39",
     "vue-router": "^4.3.2"
   },
   "devDependencies": {
@@ -32,14 +32,14 @@
     "@types/node": "^20.12.12",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/eslint-config-typescript": "^13.0.0",
-    "@vue/test-utils": "^2.4.6",
-    "@vue/tsconfig": "^0.5.1",
+    "@vue/test-utils": "^2.4.11",
+    "@vue/tsconfig": "^0.9.1",
     "eslint": "^8.57.0",
     "eslint-plugin-vue": "^9.26.0",
     "jsdom": "^24.0.0",
     "typescript": "~5.4.5",
     "vite": "^5.2.11",
     "vitest": "^1.6.0",
-    "vue-tsc": "^3.3.3"
+    "vue-tsc": "^3.3.5"
   }
 }
