@@ -197,3 +197,54 @@ npm run dev   # http://localhost:5173
 ```
 
 Requests to `/api/*` are proxied to the backend at `http://localhost:8080`.
+
+---
+
+## Deployment
+
+The app is deployed on **Render** (backend + frontend + PostgreSQL) and is
+publicly available at **https://grupo10-frontend.onrender.com**.
+
+Deployment is automatic: every merge to `main` triggers the CI pipeline and,
+once it's green, redeploys the services to Render — no manual steps required.
+
+---
+
+## Contributing
+
+This project follows [Trunk Based Development](https://trunkbaseddevelopment.com/). Please read the following before opening a Pull Request.
+
+**Branch naming**
+
+Branches must be short-lived and named after the task they address:
+
+```
+feat/user-authentication
+fix/note-status-transition
+chore/update-dependencies
+```
+
+**Commit messages**
+
+Write commits in English using the [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+feat: add AI feedback endpoint for notes
+fix: correct foreign key constraint on enrollments
+chore: upgrade Go to 1.25
+```
+
+**Pull Requests**
+
+- Every PR must be reviewed by at least one other team member before merging.
+- Link the PR to its corresponding GitHub Projects task.
+- Keep PRs small and focused — one task per PR.
+- Delete the branch after merging.
+
+**Everything in English:** code, comments, branch names, commit messages, PR descriptions, and GitHub Projects tasks.
+
+---
+
+## Technical documentation
+
+Full architecture notes, data model and design decisions are available in [`/docs`](/docs).
